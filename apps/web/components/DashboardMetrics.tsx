@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { DashboardMetrics as DashboardMetricsType } from 'bookkeeping-shared';
+import type { DashboardMetrics as DashboardMetricsType } from 'bookkeeping-shared';
 import { Card, MetricCardSkeleton } from '@/components/ui';
 
 interface DashboardMetricsProps {
