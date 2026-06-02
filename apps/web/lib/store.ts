@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User } from 'bookkeeping-shared';
+import type { User } from '@/lib/types';
 
 interface UserStore {
   user: User | null;
