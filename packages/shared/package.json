@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Shared types and utilities",
   "private": true,
-  "main": "index.ts",
-  "types": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "index.ts",
-    "types.ts"
-  ]
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  }
 }

@@ -11,7 +11,8 @@
   ],
   "scripts": {
     "dev": "npm --workspace=apps/web run dev",
-    "build": "npm --workspace=apps/web run build",
+    "build": "npm --workspace=packages/shared run build && npm --workspace=apps/web run build",
+    "build:shared": "npm --workspace=packages/shared run build",
     "start": "npm --workspace=apps/web run start",
     "mobile": "npm --workspace=apps/mobile run start"
   },
