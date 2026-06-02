@@ -1,5 +1,4 @@
 {
-  "rootDirectory": "apps/web",
-  "buildCommand": "cd ../.. && npm --workspace=packages/shared run build && npm --workspace=apps/web run build",
+  "buildCommand": "npm --workspace=packages/shared run build && npm --workspace=apps/web run build",
   "framework": "nextjs"
 }
