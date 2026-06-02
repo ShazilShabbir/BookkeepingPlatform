@@ -14,7 +14,7 @@ const app = getApps().length === 0
   ? initializeApp({ credential: cert(getServiceAccount()) })
   : getApps()[0];
 
-const db = getFirestore(app);
+const db = getFirestore('bookkeeping');
 const auth = getAuth(app);
 
 export { db, auth };

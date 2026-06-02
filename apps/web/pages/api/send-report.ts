@@ -150,12 +150,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const resend = new Resend(resendApiKey);
       const ownerName = decoded.name || decoded.email || 'Your Business';
       const html = generateHTML(report, ownerName);
-      await resend.emails.send({
-        from: 'Bookkeeping <reports@bookkeeping-platform.com>',
+      const { data: emailResult, error: emailError } = await resend.emails.send({
+        from: 'Bookkeeping <onboarding@resend.dev>',
         to: email,
         subject: `Bookkeeping Report (${effectiveStart} – ${effectiveEnd})`,
         html,
       });
+      if (emailError) {
+        return res.status(500).json({ success: false, error: emailError.message });
+      }
     }
 
     return res.status(200).json({ success: true, data: report, sent: !!email });
