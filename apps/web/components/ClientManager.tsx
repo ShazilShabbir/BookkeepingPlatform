@@ -57,10 +57,21 @@ export default function ClientManager() {
         body: JSON.stringify({ clientName: name.trim(), email: email.trim() }),
       });
       if (json.success) {
-        toast.success('Client added');
+        const shareLink = `${window.location.origin}/reports/${json.data.accessToken}`;
         setName('');
         setEmail('');
         loadClients();
+        if (email.trim()) {
+          api('/api/send-report', {
+            method: 'POST',
+            body: JSON.stringify({ email: email.trim(), shareLink, ownerName: 'Your Report' }),
+          }).then((r) => {
+            if (r.success) toast.success('Client added & report sent');
+            else toast.error('Client added, but email failed: ' + (r.error || ''));
+          });
+        } else {
+          toast.success('Client added');
+        }
       } else {
         toast.error(json.error || 'Failed to add client');
       }
