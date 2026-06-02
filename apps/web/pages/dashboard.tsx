@@ -6,12 +6,14 @@ import RevenueChart from '@/components/RevenueChart';
 import ExpenseChart from '@/components/ExpenseChart';
 import ImportCSV from '@/components/ImportCSV';
 import ReportPanel from '@/components/ReportPanel';
+import ClientManager from '@/components/ClientManager';
 import { Tabs } from '@/components/ui';
 
 const tabItems = [
   { id: 'overview', label: 'Overview' },
   { id: 'import', label: 'Import Data' },
   { id: 'reports', label: 'Reports' },
+  { id: 'clients', label: 'Clients' },
 ];
 
 export default function Dashboard() {
@@ -21,7 +23,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ['import', 'reports'].includes(tab)) {
+    if (tab && ['import', 'reports', 'clients'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
@@ -71,6 +73,12 @@ export default function Dashboard() {
         {activeTab === 'reports' && (
           <div className="animate-fade-in">
             <ReportPanel userName={user.name || user.email || ''} />
+          </div>
+        )}
+
+        {activeTab === 'clients' && (
+          <div className="animate-fade-in">
+            <ClientManager />
           </div>
         )}
       </div>
