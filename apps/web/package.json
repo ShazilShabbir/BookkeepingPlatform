@@ -21,6 +21,7 @@
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.0",
     "recharts": "^2.15.4",
+    "resend": "^3.5.0",
     "zustand": "^4.4.0"
   },
   "devDependencies": {

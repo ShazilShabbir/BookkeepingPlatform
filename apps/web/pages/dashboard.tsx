@@ -5,11 +5,13 @@ import DashboardMetrics from '@/components/DashboardMetrics';
 import RevenueChart from '@/components/RevenueChart';
 import ExpenseChart from '@/components/ExpenseChart';
 import ImportCSV from '@/components/ImportCSV';
+import ReportPanel from '@/components/ReportPanel';
 import { Tabs } from '@/components/ui';
 
 const tabItems = [
   { id: 'overview', label: 'Overview' },
   { id: 'import', label: 'Import Data' },
+  { id: 'reports', label: 'Reports' },
 ];
 
 export default function Dashboard() {
@@ -18,8 +20,9 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    if (router.query.tab === 'import') {
-      setActiveTab('import');
+    const tab = router.query.tab as string;
+    if (tab && ['import', 'reports'].includes(tab)) {
+      setActiveTab(tab);
     }
   }, [router.query.tab]);
 
@@ -62,6 +65,12 @@ export default function Dashboard() {
         {activeTab === 'import' && (
           <div className="animate-fade-in">
             <ImportCSV userId={user.id} />
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="animate-fade-in">
+            <ReportPanel userId={user.id} userName={user.name || user.email || ''} />
           </div>
         )}
       </div>
