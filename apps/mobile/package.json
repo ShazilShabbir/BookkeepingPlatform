@@ -1,0 +1,29 @@
+{
+  "name": "bookkeeping-mobile",
+  "version": "1.0.0",
+  "description": "React Native mobile app with Expo",
+  "private": true,
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "^6.5.0",
+    "@react-navigation/native": "^6.1.0",
+    "axios": "^1.6.0",
+    "expo": "^56.0.8",
+    "firebase": "^10.0.0",
+    "next": "16.2.7",
+    "next-auth": "3.29.10",
+    "react": "^19.1.1",
+    "react-native": "^0.82.0",
+    "react-native-svg-charts": "^5.4.0",
+    "zustand": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/react-native": "^0.72.0",
+    "typescript": "^5.0.0"
+  }
+}

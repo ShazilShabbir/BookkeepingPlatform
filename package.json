@@ -1,0 +1,23 @@
+{
+  "name": "bookkeeping-platform",
+  "version": "1.0.0",
+  "description": "Full-stack sales analytics platform with real-time dashboards and client reports",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/api",
+    "apps/mobile",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "npm --workspace=apps/web run dev",
+    "build": "npm workspaces run build",
+    "start": "npm --workspace=apps/web run start",
+    "mobile": "npm --workspace=apps/mobile run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}

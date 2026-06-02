@@ -1,0 +1,12 @@
+{
+  "name": "bookkeeping-shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "files": [
+    "index.ts",
+    "types.ts"
+  ]
+}

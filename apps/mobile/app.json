@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Bookkeeping Mobile",
+    "slug": "bookkeeping-mobile",
+    "version": "1.0.0",
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["@react-native-firebase/app"],
+    "android": {
+      "package": "com.bookkeeping.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.bookkeeping.mobile"
+    }
+  }
+}
