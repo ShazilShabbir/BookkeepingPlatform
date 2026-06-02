@@ -1,16 +1,20 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+function getServiceAccount() {
+  const key = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!key) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set');
+  }
+  return JSON.parse(key);
+}
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app, 'bookkeeping');
+const app = getApps().length === 0
+  ? initializeApp({ credential: cert(getServiceAccount()) })
+  : getApps()[0];
 
-export { db };
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+export { db, auth };

@@ -70,7 +70,7 @@ export default function Dashboard() {
 
         {activeTab === 'reports' && (
           <div className="animate-fade-in">
-            <ReportPanel userId={user.id} userName={user.name || user.email || ''} />
+            <ReportPanel userName={user.name || user.email || ''} />
           </div>
         )}
       </div>

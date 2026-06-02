@@ -1,14 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase-server';
+import { db, auth } from '@/lib/firebase-server';
 import { Resend } from 'resend';
-
-type Entry = {
-  date: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category: string;
-};
 
 type ReportData = {
   totalRevenue: number;
@@ -36,7 +28,7 @@ function generateHTML(report: ReportData, ownerName: string): string {
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:0">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
     <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:24px">📊 Bookkeeping Report</h1>
+      <h1 style="color:#fff;margin:0;font-size:24px">Bookkeeping Report</h1>
       <p style="color:#c7d2fe;margin:8px 0 0;font-size:14px">${ownerName} &middot; ${report.dateRange.start} – ${report.dateRange.end}</p>
     </td></tr>
     <tr><td style="padding:24px">
@@ -91,30 +83,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { userId, email, startDate, endDate } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing authorization header' });
     }
 
-    const conditions = [where('userId', '==', userId)];
-    if (startDate) conditions.push(where('date', '>=', startDate));
-    if (endDate) conditions.push(where('date', '<=', endDate));
+    const idToken = authHeader.slice(7);
+    const decoded = await auth.verifyIdToken(idToken);
+    const uid = decoded.uid;
 
-    const q = query(collection(db, 'ledger_entries'), ...conditions);
-    const snapshot = await getDocs(q);
+    const { email, startDate, endDate } = req.body;
 
-    const entries: Entry[] = [];
-    snapshot.forEach((doc) => {
-      const d = doc.data() as Entry;
-      entries.push(d);
-    });
+    let queryRef: FirebaseFirestore.Query = db.collection('ledger_entries').where('userId', '==', uid);
+    if (startDate) queryRef = queryRef.where('date', '>=', startDate);
+    if (endDate) queryRef = queryRef.where('date', '<=', endDate);
+
+    const snapshot = await queryRef.get();
 
     let totalRevenue = 0;
     let totalExpenses = 0;
     const categoryMap = new Map<string, { amount: number; count: number }>();
 
-    for (const entry of entries) {
+    snapshot.forEach((doc) => {
+      const entry = doc.data() as { date: string; amount: number; type: 'income' | 'expense'; category: string };
       if (entry.type === 'income') {
         totalRevenue += entry.amount;
       } else {
@@ -125,7 +116,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       existing.amount += entry.type === 'income' ? entry.amount : -Math.abs(entry.amount);
       existing.count++;
       categoryMap.set(cat, existing);
-    }
+    });
 
     const netProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
@@ -135,6 +126,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
       .slice(0, 5);
 
+    const entries: { date: string }[] = [];
+    snapshot.forEach((doc) => entries.push(doc.data() as { date: string }));
     const dates = entries.map((e) => e.date).filter(Boolean).sort();
     const effectiveStart = startDate || dates[0] || 'N/A';
     const effectiveEnd = endDate || dates[dates.length - 1] || 'N/A';
@@ -155,7 +148,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'RESEND_API_KEY not configured' });
       }
       const resend = new Resend(resendApiKey);
-      const html = generateHTML(report, req.body.ownerName || 'Your Business');
+      const ownerName = decoded.name || decoded.email || 'Your Business';
+      const html = generateHTML(report, ownerName);
       await resend.emails.send({
         from: 'Bookkeeping <reports@bookkeeping-platform.com>',
         to: email,

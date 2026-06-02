@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { auth } from '@/lib/firebase';
 import { Card } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
@@ -15,26 +16,36 @@ type ReportData = {
 };
 
 interface ReportPanelProps {
-  userId: string;
   userName: string;
 }
 
-export default function ReportPanel({ userId, userName }: ReportPanelProps) {
+async function getAuthToken(): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  return user.getIdToken();
+}
+
+async function fetchReport(payload: Record<string, unknown>) {
+  const token = await getAuthToken();
+  const res = await fetch('/api/send-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export default function ReportPanel({ userName }: ReportPanelProps) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<ReportData | null>(null);
   const [sent, setSent] = useState(false);
 
-  const generatePreview = async () => {
+  const handlePreview = async () => {
     setLoading(true);
     setPreview(null);
     try {
-      const res = await fetch('/api/send-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, ownerName: userName }),
-      });
-      const json = await res.json();
+      const json = await fetchReport({ ownerName: userName });
       if (json.success) {
         setPreview(json.data);
       } else {
@@ -47,7 +58,7 @@ export default function ReportPanel({ userId, userName }: ReportPanelProps) {
     }
   };
 
-  const sendReport = async () => {
+  const handleSend = async () => {
     if (!email.trim()) {
       toast.error('Please enter an email address');
       return;
@@ -55,12 +66,7 @@ export default function ReportPanel({ userId, userName }: ReportPanelProps) {
     setLoading(true);
     setSent(false);
     try {
-      const res = await fetch('/api/send-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, email: email.trim(), ownerName: userName }),
-      });
-      const json = await res.json();
+      const json = await fetchReport({ email: email.trim(), ownerName: userName });
       if (json.success) {
         setSent(true);
         setPreview(json.data);
@@ -94,10 +100,10 @@ export default function ReportPanel({ userId, userName }: ReportPanelProps) {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={generatePreview} loading={loading && !email}>
+            <Button variant="secondary" onClick={handlePreview} loading={loading && !email}>
               Preview
             </Button>
-            <Button onClick={sendReport} loading={loading && !!email}>
+            <Button onClick={handleSend} loading={loading && !!email}>
               Send Report
             </Button>
           </div>
@@ -116,56 +122,54 @@ export default function ReportPanel({ userId, userName }: ReportPanelProps) {
       )}
 
       {preview && (
-        <>
-          <Card padding="lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-surface-900">Report Preview</h3>
-              <span className="text-xs text-surface-400">
-                {preview.dateRange.start} – {preview.dateRange.end}
-              </span>
+        <Card padding="lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-surface-900">Report Preview</h3>
+            <span className="text-xs text-surface-400">
+              {preview.dateRange.start} – {preview.dateRange.end}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-surface-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-surface-500 uppercase tracking-wider">Revenue</p>
+              <p className="text-xl font-bold text-emerald-600 mt-1">{currency(preview.totalRevenue)}</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-surface-50 rounded-lg p-4 text-center">
-                <p className="text-xs text-surface-500 uppercase tracking-wider">Revenue</p>
-                <p className="text-xl font-bold text-emerald-600 mt-1">{currency(preview.totalRevenue)}</p>
-              </div>
-              <div className="bg-surface-50 rounded-lg p-4 text-center">
-                <p className="text-xs text-surface-500 uppercase tracking-wider">Expenses</p>
-                <p className="text-xl font-bold text-red-500 mt-1">{currency(preview.totalExpenses)}</p>
-              </div>
-              <div className="bg-surface-50 rounded-lg p-4 text-center">
-                <p className="text-xs text-surface-500 uppercase tracking-wider">Net Profit</p>
-                <p className={`text-xl font-bold mt-1 ${preview.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {currency(preview.netProfit)}
-                </p>
-              </div>
-              <div className="bg-surface-50 rounded-lg p-4 text-center">
-                <p className="text-xs text-surface-500 uppercase tracking-wider">Margin</p>
-                <p className="text-xl font-bold text-primary-600 mt-1">{preview.profitMargin.toFixed(1)}%</p>
-              </div>
+            <div className="bg-surface-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-surface-500 uppercase tracking-wider">Expenses</p>
+              <p className="text-xl font-bold text-red-500 mt-1">{currency(preview.totalExpenses)}</p>
             </div>
-            <div className="mt-4 bg-surface-50 rounded-lg p-4 text-center">
-              <p className="text-xs text-surface-500 uppercase tracking-wider">Total Entries</p>
-              <p className="text-lg font-semibold text-surface-900 mt-1">{preview.entryCount}</p>
+            <div className="bg-surface-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-surface-500 uppercase tracking-wider">Net Profit</p>
+              <p className={`text-xl font-bold mt-1 ${preview.netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                {currency(preview.netProfit)}
+              </p>
             </div>
-            {preview.topCategories.length > 0 && (
-              <div className="mt-6">
-                <h4 className="text-sm font-semibold text-surface-700 mb-3">Top Categories</h4>
-                <div className="space-y-2">
-                  {preview.topCategories.map((cat) => (
-                    <div key={cat.category} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-surface-700 capitalize">{cat.category}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs text-surface-400">{cat.count} entries</span>
-                        <span className="text-sm font-semibold text-surface-900">{currency(cat.amount)}</span>
-                      </div>
+            <div className="bg-surface-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-surface-500 uppercase tracking-wider">Margin</p>
+              <p className="text-xl font-bold text-primary-600 mt-1">{preview.profitMargin.toFixed(1)}%</p>
+            </div>
+          </div>
+          <div className="mt-4 bg-surface-50 rounded-lg p-4 text-center">
+            <p className="text-xs text-surface-500 uppercase tracking-wider">Total Entries</p>
+            <p className="text-lg font-semibold text-surface-900 mt-1">{preview.entryCount}</p>
+          </div>
+          {preview.topCategories.length > 0 && (
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-surface-700 mb-3">Top Categories</h4>
+              <div className="space-y-2">
+                {preview.topCategories.map((cat) => (
+                  <div key={cat.category} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-surface-700 capitalize">{cat.category}</span>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs text-surface-400">{cat.count} entries</span>
+                      <span className="text-sm font-semibold text-surface-900">{currency(cat.amount)}</span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </Card>
-        </>
+            </div>
+          )}
+        </Card>
       )}
     </div>
   );
