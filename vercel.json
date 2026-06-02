@@ -1,15 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "apps/web/package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "apps/web"
-    }
-  ]
+  "rootDirectory": "apps/web",
+  "buildCommand": "cd ../.. && npm --workspace=packages/shared run build && npm --workspace=apps/web run build",
+  "framework": "nextjs"
 }
