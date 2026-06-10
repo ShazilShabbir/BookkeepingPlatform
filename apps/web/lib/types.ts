@@ -18,6 +18,39 @@ export interface ClientAccount {
   updatedAt: string;
 }
 
+export type SourceType = 'bank-statement' | 'sales-csv' | 'manual' | 'adjustment' | 'import';
+
+export interface JournalEntry {
+  id: string;
+  userId: string;
+  clientId: string;
+  date: string;
+  description: string;
+  source: SourceType;
+  sourceFile?: string;
+  reference?: string;
+  status: 'posted' | 'draft';
+  lineCount: number;
+  createdAt: string;
+  jobId?: string;
+}
+
+export interface JournalLine {
+  id: string;
+  journalEntryId: string;
+  userId: string;
+  clientId: string;
+  accountCode: string;
+  accountName: string;
+  accountType: AccountType;
+  debit: number;
+  credit: number;
+  description?: string;
+  rawData?: Record<string, any>;
+  ledgerEntryId?: string;
+  jobId?: string;
+}
+
 export interface LedgerEntry {
   id: string;
   clientId: string;
@@ -30,6 +63,35 @@ export interface LedgerEntry {
   source: string;
   metadata?: Record<string, any>;
   importedAt: string;
+  accountCode?: string;
+  accountName?: string;
+  accountType?: AccountType;
+  journalEntryId?: string;
+  jobId?: string;
+}
+
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+
+export interface Account {
+  id: string;
+  userId: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  normalBalance: 'debit' | 'credit';
+  description?: string;
+  isActive: boolean;
+  parentCode?: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface CategoryMapping {
+  id: string;
+  userId: string;
+  csvCategory: string;
+  accountCode: string;
+  createdAt: string;
 }
 
 export interface ImportSummary {
@@ -114,4 +176,34 @@ export interface PaginatedResponse<T> {
   pageSize: number;
   total: number;
   hasMore: boolean;
+}
+
+export interface ColumnMapping {
+  dateColumn: string;
+  amountColumn: string;
+  costColumn: string;
+  descriptionColumn: string;
+  categoryColumn: string;
+  idColumn: string;
+  quantityColumn: string;
+}
+
+export interface ImportJob {
+  userId: string;
+  fileName: string;
+  filePath: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  totalRows: number;
+  processedRows: number;
+  importedEntries: number;
+  skippedRows: number;
+  errors: { row: number; reason: string }[];
+  mapping: ColumnMapping;
+  duplicatesSkipped?: number;
+  duplicateRows?: { row: number; description: string; date: string; matchedDescription: string }[];
+  excludedRows?: number[];
+  dedupEnabled?: boolean;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
 }

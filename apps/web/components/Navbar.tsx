@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { signOut } from 'next-auth/react';
 import { useUserStore } from '@/lib/store';
+import CustomerSwitcher from '@/components/CustomerSwitcher';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/dashboard?tab=import', label: 'Import Data' },
 ];
 
 export default function Navbar() {
@@ -19,23 +18,14 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await signOut({ callbackUrl: '/login' });
       toast.success('Logged out');
-      router.push('/login');
     } catch (error: any) {
       toast.error(error.message);
     }
   };
 
-  const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return router.pathname === '/dashboard' && !router.query.tab;
-    }
-    if (href === '/dashboard?tab=import') {
-      return router.query.tab === 'import';
-    }
-    return false;
-  };
+  const isActive = (href: string) => router.pathname === '/dashboard';
 
   return (
     <nav className="bg-white border-b border-surface-200 sticky top-0 z-50">
@@ -67,7 +57,10 @@ export default function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {user && router.pathname === '/dashboard' && (
+              <CustomerSwitcher />
+            )}
             {user && (
               <div className="relative">
                 <button

@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { DashboardMetrics as DashboardMetricsType } from '@/lib/types';
 import { Card, MetricCardSkeleton } from '@/components/ui';
 
@@ -84,52 +82,30 @@ function AnimatedValue({ value, prefix = '', suffix = '', decimals = 2 }: { valu
 
 export default function DashboardMetrics({ userId }: DashboardMetricsProps) {
   const [metrics, setMetrics] = useState<DashboardMetricsType | null>(null);
+  const [accountTypeCount, setAccountTypeCount] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const entriesRef = collection(db, 'ledger_entries');
-        const q = query(entriesRef, where('userId', '==', userId));
-        const snapshot = await getDocs(q);
+        const res = await fetch('/api/dashboard/summary');
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || 'Failed to fetch');
+        const { kpis, profitLoss } = json.data;
 
-        let totalIncome = 0;
-        let totalExpenses = 0;
-        const categoryStats: Record<string, { amount: number; count: number }> = {};
-
-        snapshot.forEach((doc) => {
-          const entry = doc.data();
-          if (entry.type === 'income') {
-            totalIncome += entry.amount;
-          } else {
-            totalExpenses += Math.abs(entry.amount);
-          }
-
-          if (!categoryStats[entry.category]) {
-            categoryStats[entry.category] = { amount: 0, count: 0 };
-          }
-          categoryStats[entry.category].amount += entry.amount;
-          categoryStats[entry.category].count += 1;
-        });
-
-        const netProfit = totalIncome - totalExpenses;
-        const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+        setAccountTypeCount(
+          Object.fromEntries(
+            (profitLoss.sections || []).map((s: any) => [s.type, s.accounts?.length || 0])
+          )
+        );
 
         setMetrics({
-          totalRevenue: totalIncome,
-          totalExpenses,
-          netProfit,
-          profitMargin,
-          entryCount: snapshot.size,
-          topCategories: Object.entries(categoryStats)
-            .map(([category, data]) => ({
-              category,
-              amount: data.amount,
-              count: data.count,
-              percentage: (data.amount / totalIncome) * 100,
-            }))
-            .sort((a, b) => b.amount - a.amount)
-            .slice(0, 5),
+          totalRevenue: kpis.totalRevenue,
+          totalExpenses: kpis.totalExpenses,
+          netProfit: kpis.netProfit,
+          profitMargin: kpis.profitMargin,
+          entryCount: kpis.entryCount,
+          topCategories: [],
           revenueByCategory: [],
           expensesByCategory: [],
           dailyMetrics: [],
@@ -155,10 +131,38 @@ export default function DashboardMetrics({ userId }: DashboardMetricsProps) {
   if (!metrics) {
     return (
       <Card padding="lg" className="text-center py-12">
-        <svg className="w-12 h-12 text-surface-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-        </svg>
-        <p className="text-surface-500">No data available yet. Import a CSV to get started.</p>
+        <div className="max-w-md mx-auto">
+          <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-surface-900 mb-2">Welcome to BookKeep</h2>
+          <p className="text-surface-500 mb-8">Get started in 3 simple steps</p>
+          <div className="space-y-4 text-left">
+            <div className="flex items-start gap-4 p-4 bg-surface-50 rounded-xl border border-surface-200">
+              <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-bold shrink-0">1</div>
+              <div>
+                <h3 className="font-semibold text-surface-900 text-sm">Import your first CSV</h3>
+                <p className="text-sm text-surface-500 mt-1">Upload a bank statement or sales CSV. AI auto-detects columns and classifies transactions.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-4 bg-surface-50 rounded-xl border border-surface-200">
+              <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-bold shrink-0">2</div>
+              <div>
+                <h3 className="font-semibold text-surface-900 text-sm">Review & confirm</h3>
+                <p className="text-sm text-surface-500 mt-1">Check auto-classified transactions, override accounts if needed, then confirm.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-4 bg-surface-50 rounded-xl border border-surface-200">
+              <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-bold shrink-0">3</div>
+              <div>
+                <h3 className="font-semibold text-surface-900 text-sm">View reports</h3>
+                <p className="text-sm text-surface-500 mt-1">See your Profit & Loss and Balance Sheet instantly. Download beautiful Excel reports.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </Card>
     );
   }
@@ -173,9 +177,18 @@ export default function DashboardMetrics({ userId }: DashboardMetricsProps) {
     }
   };
 
+  const TYPE_LABELS: Record<string, string> = {
+    asset: 'Assets', liability: 'Liabilities', equity: 'Equity', revenue: 'Revenue', expense: 'Expenses',
+  };
+  const TYPE_COLORS: Record<string, string> = {
+    asset: 'bg-blue-50 text-blue-700', liability: 'bg-amber-50 text-amber-700',
+    equity: 'bg-purple-50 text-purple-700', revenue: 'bg-emerald-50 text-emerald-700', expense: 'bg-red-50 text-red-700',
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {metricConfig.map((metric) => {
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricConfig.map((metric) => {
         const value = getValue(metric.key);
         const isProfit = metric.key === 'netProfit';
         const isMargin = metric.key === 'profitMargin';
@@ -214,5 +227,16 @@ export default function DashboardMetrics({ userId }: DashboardMetricsProps) {
         );
       })}
     </div>
+
+    {Object.keys(accountTypeCount).length > 0 && (
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(accountTypeCount).map(([type, count]) => (
+          <span key={type} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${TYPE_COLORS[type] || 'bg-surface-100 text-surface-600'}`}>
+            {TYPE_LABELS[type] || type}: {count}
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
   );
 }

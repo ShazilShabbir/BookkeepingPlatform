@@ -1,175 +1,52 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { db, auth } from '@/lib/firebase-server';
-import { Resend } from 'resend';
-
-type ReportData = {
-  totalRevenue: number;
-  totalExpenses: number;
-  netProfit: number;
-  profitMargin: number;
-  entryCount: number;
-  topCategories: { category: string; amount: number; count: number }[];
-  dateRange: { start: string; end: string };
-};
-
-function generateHTML(report: ReportData, ownerName: string, shareLink?: string): string {
-  const revenue = report.totalRevenue.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  const expenses = report.totalExpenses.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  const profit = report.netProfit.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  const margin = report.profitMargin.toFixed(1);
-  const categories = report.topCategories.map(
-    (c) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${c.category}</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right">${c.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:center">${c.count}</td></tr>`
-  ).join('');
-
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:0">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-    <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:24px">Bookkeeping Report</h1>
-      <p style="color:#c7d2fe;margin:8px 0 0;font-size:14px">${ownerName} &middot; ${report.dateRange.start} – ${report.dateRange.end}</p>
-    </td></tr>
-    <tr><td style="padding:24px">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="width:50%;padding:16px;text-align:center">
-            <p style="color:#64748b;font-size:12px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Revenue</p>
-            <p style="color:#10b981;font-size:28px;font-weight:700;margin:4px 0">${revenue}</p>
-          </td>
-          <td style="width:50%;padding:16px;text-align:center">
-            <p style="color:#64748b;font-size:12px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Expenses</p>
-            <p style="color:#ef4444;font-size:28px;font-weight:700;margin:4px 0">${expenses}</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="width:50%;padding:16px;text-align:center">
-            <p style="color:#64748b;font-size:12px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Net Profit</p>
-            <p style="color:${report.netProfit >= 0 ? '#10b981' : '#ef4444'};font-size:28px;font-weight:700;margin:4px 0">${profit}</p>
-          </td>
-          <td style="width:50%;padding:16px;text-align:center">
-            <p style="color:#64748b;font-size:12px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Profit Margin</p>
-            <p style="color:#6366f1;font-size:28px;font-weight:700;margin:4px 0">${margin}%</p>
-          </td>
-        </tr>
-      </table>
-      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:16px 0;text-align:center">
-        <p style="color:#64748b;font-size:12px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Total Entries</p>
-        <p style="color:#1e293b;font-size:20px;font-weight:600;margin:4px 0">${report.entryCount}</p>
-      </div>
-      ${report.topCategories.length > 0 ? `
-      <h3 style="color:#1e293b;font-size:16px;margin:24px 0 12px">Top Categories</h3>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
-        <thead><tr style="background:#f8fafc">
-          <th style="padding:8px 12px;text-align:left;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.5px">Category</th>
-          <th style="padding:8px 12px;text-align:right;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.5px">Amount</th>
-          <th style="padding:8px 12px;text-align:center;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:0.5px">Count</th>
-        </tr></thead>
-        <tbody>${categories}</tbody>
-      </table>` : ''}
-      ${shareLink ? `
-      <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:16px;margin-top:24px;text-align:center">
-        <p style="color:#4338ca;font-size:14px;font-weight:600;margin:0 0 8px">View Live Report</p>
-        <a href="${shareLink}" style="color:#6366f1;font-size:13px;word-break:break-all">${shareLink}</a>
-        <p style="color:#64748b;font-size:12px;margin:8px 0 0">Open this link anytime to see your up-to-date financial data.</p>
-      </div>` : ''}
-    </td></tr>
-    <tr><td style="background:#f8fafc;padding:16px;text-align:center;color:#94a3b8;font-size:12px">
-      <p style="margin:0">Generated by Bookkeeping Platform</p>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}
+import { getToken } from 'next-auth/jwt';
+import { getFinancialStatements, generateReportHTML } from '@/lib/reports';
+import { generateWorkbook } from '@/lib/excel';
+import User from '@/lib/models/User';
+import Client from '@/lib/models/Client';
+import dbConnect from '@/lib/mongoose';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const uid = token.sub!;
+
+  await dbConnect();
 
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization header' });
-    }
+    const { clientId, startDate, endDate, email } = req.body;
+    if (!email) return res.status(400).json({ error: 'email is required' });
 
-    const idToken = authHeader.slice(7);
-    const decoded = await auth.verifyIdToken(idToken);
-    const uid = decoded.uid;
+    const user = await User.findById(uid).lean();
+    const ownerName = (user as any)?.name || 'Business Owner';
 
-    const { email, startDate, endDate } = req.body;
+    const client = await Client.findOne({ _id: clientId, userId: uid }).lean();
+    const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
 
-    let queryRef: FirebaseFirestore.Query = db.collection('ledger_entries').where('userId', '==', uid);
-    if (startDate) queryRef = queryRef.where('date', '>=', startDate);
-    if (endDate) queryRef = queryRef.where('date', '<=', endDate);
+    const statements = await getFinancialStatements(uid, startDate, endDate);
+    const html = generateReportHTML(statements, ownerName, shareLink);
+    const workbook = await generateWorkbook(uid, startDate, endDate);
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    const snapshot = await queryRef.get();
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
-    let totalRevenue = 0;
-    let totalExpenses = 0;
-    const categoryMap = new Map<string, { amount: number; count: number }>();
+    const base64 = buffer.toString('base64');
+    const dateLabel = startDate && endDate ? `${startDate} to ${endDate}` : 'All Time';
 
-    snapshot.forEach((doc) => {
-      const entry = doc.data() as { date: string; amount: number; type: 'income' | 'expense'; category: string };
-      if (entry.type === 'income') {
-        totalRevenue += entry.amount;
-      } else {
-        totalExpenses += Math.abs(entry.amount);
-      }
-      const cat = entry.category || 'uncategorized';
-      const existing = categoryMap.get(cat) || { amount: 0, count: 0 };
-      existing.amount += entry.type === 'income' ? entry.amount : -Math.abs(entry.amount);
-      existing.count++;
-      categoryMap.set(cat, existing);
+    await resend.emails.send({
+      from: 'BookKeep <onboarding@resend.dev>',
+      to: email,
+      subject: `Financial Report - ${dateLabel}`,
+      html,
+      attachments: [{ filename: 'financial-report.xlsx', content: base64, content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }],
     });
 
-    const netProfit = totalRevenue - totalExpenses;
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
-
-    const topCategories = Array.from(categoryMap.entries())
-      .map(([category, stats]) => ({ category, amount: stats.amount, count: stats.count }))
-      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
-      .slice(0, 5);
-
-    const entries: { date: string }[] = [];
-    snapshot.forEach((doc) => entries.push(doc.data() as { date: string }));
-    const dates = entries.map((e) => e.date).filter(Boolean).sort();
-    const effectiveStart = startDate || dates[0] || 'N/A';
-    const effectiveEnd = endDate || dates[dates.length - 1] || 'N/A';
-
-    const report: ReportData = {
-      totalRevenue,
-      totalExpenses,
-      netProfit,
-      profitMargin,
-      entryCount: entries.length,
-      topCategories,
-      dateRange: { start: effectiveStart, end: effectiveEnd },
-    };
-
-    if (email) {
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (!resendApiKey) {
-        return res.status(500).json({ error: 'RESEND_API_KEY not configured' });
-      }
-      const resend = new Resend(resendApiKey);
-      const ownerName = decoded.name || decoded.email || 'Your Business';
-      const shareLink = req.body.shareLink as string | undefined;
-      const html = generateHTML(report, ownerName, shareLink);
-      const { data: emailResult, error: emailError } = await resend.emails.send({
-        from: 'Bookkeeping <onboarding@resend.dev>',
-        to: email,
-        subject: `Bookkeeping Report (${effectiveStart} – ${effectiveEnd})`,
-        html,
-      });
-      if (emailError) {
-        return res.status(500).json({ success: false, error: emailError.message });
-      }
-    }
-
-    return res.status(200).json({ success: true, data: report, sent: !!email });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(200).json({ success: true });
+  } catch (e: any) {
+    console.error('send-report error:', e?.message || e);
+    return res.status(500).json({ error: e?.message || 'Failed to send report' });
   }
 }

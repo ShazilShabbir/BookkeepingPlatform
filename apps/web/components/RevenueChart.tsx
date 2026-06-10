@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Card, ChartSkeleton } from '@/components/ui';
-import { format, parseISO, subDays, startOfDay } from 'date-fns';
 
 interface RevenueChartProps {
   userId: string;
@@ -19,6 +16,7 @@ const ranges = [
   { label: '30d', days: 30 },
   { label: '90d', days: 90 },
   { label: '1y', days: 365 },
+  { label: 'All', days: 0 },
 ];
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -40,26 +38,16 @@ export default function RevenueChart({ userId }: RevenueChartProps) {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const entriesRef = collection(db, 'ledger_entries');
-        const q = query(entriesRef, where('userId', '==', userId), where('type', '==', 'income'));
-        const snapshot = await getDocs(q);
-
-        const cutoff = startOfDay(subDays(new Date(), range));
-        const dailyData: Record<string, number> = {};
-
-        snapshot.forEach((doc) => {
-          const entry = doc.data();
-          if (!entry.date) return;
-          const entryDate = parseISO(entry.date);
-          if (entryDate < cutoff) return;
-          if (!dailyData[entry.date]) dailyData[entry.date] = 0;
-          dailyData[entry.date] += entry.amount;
-        });
-
-        const chartData = Object.entries(dailyData)
-          .map(([date, revenue]) => ({ date, revenue }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
+        const res = await fetch('/api/dashboard/summary');
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error || 'Failed to fetch');
+        const revenueSection = json.data.profitLoss.sections.find(
+          (s: any) => s.type === 'revenue'
+        );
+        const chartData = (revenueSection?.accounts || []).map((a: any) => ({
+          date: a.accountName,
+          revenue: a.balance,
+        }));
         setData(chartData);
       } catch (error) {
         console.error('Error fetching revenue data:', error);
@@ -67,7 +55,6 @@ export default function RevenueChart({ userId }: RevenueChartProps) {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [userId, range]);
 
@@ -108,7 +95,6 @@ export default function RevenueChart({ userId }: RevenueChartProps) {
               tick={{ fontSize: 12, fill: '#94a3b8' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => { try { return format(parseISO(v), 'MMM d'); } catch { return v; } }}
             />
             <YAxis
               tick={{ fontSize: 12, fill: '#94a3b8' }}

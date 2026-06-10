@@ -1,29 +1,31 @@
-import { useEffect, useState } from 'react';
-import { useUserStore } from '@/lib/store';
+import { useEffect, useState, useMemo } from 'react';
+import { useUserStore, useCustomerStore } from '@/lib/store';
 import { useRouter } from 'next/router';
-import DashboardMetrics from '@/components/DashboardMetrics';
-import RevenueChart from '@/components/RevenueChart';
-import ExpenseChart from '@/components/ExpenseChart';
 import ImportCSV from '@/components/ImportCSV';
-import ReportPanel from '@/components/ReportPanel';
-import ClientManager from '@/components/ClientManager';
+import SearchEntries from '@/components/SearchEntries';
+import ManageCustomers from '@/components/ManageCustomers';
+import UnifiedDashboard from '@/components/UnifiedDashboard';
 import { Tabs } from '@/components/ui';
 
 const tabItems = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'import', label: 'Import Data' },
-  { id: 'reports', label: 'Reports' },
-  { id: 'clients', label: 'Clients' },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'import', label: 'Import' },
+  { id: 'transactions', label: 'Transactions' },
+  { id: 'customers', label: 'Customers' },
 ];
 
 export default function Dashboard() {
   const user = useUserStore((state) => state.user);
+  const customerUid = useCustomerStore((state) => state.customerUid);
+  const customerName = useCustomerStore((state) => state.customerName);
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const effectiveUserId = useMemo(() => customerUid || user?.id || '', [customerUid, user?.id]);
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ['import', 'reports', 'clients'].includes(tab)) {
+    if (tab && ['import', 'transactions', 'customers'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
@@ -48,37 +50,45 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">Dashboard</h1>
-            <p className="mt-1 text-surface-500">Welcome back, {user.name || user.email}</p>
+            <p className="mt-1 text-surface-500">
+              {customerUid ? `Viewing ${customerName}'s data` : `Welcome back, ${user.name || user.email}`}
+            </p>
           </div>
         </div>
 
         <Tabs tabs={tabItems} activeTab={activeTab} onChange={setActiveTab} className="mb-8" />
 
-        {activeTab === 'overview' && (
-          <div className="space-y-6 animate-fade-in">
-            <DashboardMetrics userId={user.id} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <RevenueChart userId={user.id} />
-              <ExpenseChart userId={user.id} />
-            </div>
+        {activeTab === 'dashboard' && (
+          <div className="animate-fade-in">
+            <UnifiedDashboard userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'import' && (
           <div className="animate-fade-in">
-            <ImportCSV userId={user.id} />
+            {customerUid && (
+              <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                Importing data for <strong>{customerName}</strong>
+              </div>
+            )}
+            <ImportCSV userId={effectiveUserId} />
           </div>
         )}
 
-        {activeTab === 'reports' && (
+        {activeTab === 'transactions' && (
           <div className="animate-fade-in">
-            <ReportPanel userName={user.name || user.email || ''} />
+            {customerUid && (
+              <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                Viewing transactions for <strong>{customerName}</strong>
+              </div>
+            )}
+            <SearchEntries userId={effectiveUserId} />
           </div>
         )}
 
-        {activeTab === 'clients' && (
+        {activeTab === 'customers' && (
           <div className="animate-fade-in">
-            <ClientManager />
+            <ManageCustomers />
           </div>
         )}
       </div>

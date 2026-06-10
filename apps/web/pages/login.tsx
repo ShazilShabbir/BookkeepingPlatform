@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { useUserStore } from '@/lib/store';
 import { Button, Input, Card } from '@/components/ui';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -13,7 +11,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const router = useRouter();
-  const { setUser } = useUserStore();
 
   const validate = () => {
     const errs: typeof errors = {};
@@ -30,9 +27,17 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      toast.success('Login successful');
-      router.push('/dashboard');
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+      if (result?.error) {
+        toast.error('Invalid email or password');
+      } else {
+        toast.success('Login successful');
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       toast.error(error.message || 'Login failed');
     } finally {

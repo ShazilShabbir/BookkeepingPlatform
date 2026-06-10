@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { setDoc, doc } from 'firebase/firestore';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { Button, Input, Card } from '@/components/ui';
 import Link from 'next/link';
@@ -47,23 +45,31 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-
-      await updateProfile(result.user, {
-        displayName: name,
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, companyName: company }),
       });
 
-      await setDoc(doc(db, 'users', result.user.uid), {
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Signup failed');
+        return;
+      }
+
+      const result = await signIn('credentials', {
         email,
-        name,
-        companyName: company,
-        role: 'admin',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        password,
+        redirect: false,
       });
 
-      toast.success('Account created successfully');
-      router.push('/dashboard');
+      if (result?.error) {
+        toast.error('Account created. Please sign in.');
+        router.push('/login');
+      } else {
+        toast.success('Account created successfully');
+        router.push('/dashboard');
+      }
     } catch (error: any) {
       toast.error(error.message || 'Signup failed');
     } finally {

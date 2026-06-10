@@ -1,0 +1,54 @@
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getToken } from 'next-auth/jwt';
+import dbConnect from '@/lib/mongoose';
+import ReportSchedule from '@/lib/models/ReportSchedule';
+import { getFinancialStatements, generateReportHTML } from '@/lib/reports';
+import { generateWorkbook } from '@/lib/excel';
+import User from '@/lib/models/User';
+import Client from '@/lib/models/Client';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  const uid = token.sub!;
+
+  await dbConnect();
+
+  try {
+    const { scheduleId } = req.body;
+    if (!scheduleId) return res.status(400).json({ error: 'scheduleId is required' });
+
+    const schedule = await ReportSchedule.findOne({ _id: scheduleId, userId: uid }).lean();
+    if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
+
+    const user = await User.findById(uid).lean();
+    const ownerName = (user as any)?.name || 'Business Owner';
+
+    const client = await Client.findOne({ _id: (schedule as any).clientId }).lean();
+    const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
+
+    const statements = await getFinancialStatements(uid);
+    const html = generateReportHTML(statements, ownerName, shareLink);
+    const workbook = await generateWorkbook(uid);
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const { Resend } = await import('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const base64 = buffer.toString('base64');
+
+    await resend.emails.send({
+      from: 'BookKeep <onboarding@resend.dev>',
+      to: (client as any)?.name || ownerName,
+      subject: `Scheduled Financial Report - ${(schedule as any).frequency}`,
+      html,
+      attachments: [{ filename: 'financial-report.xlsx', content: base64, content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }],
+    });
+
+    return res.status(200).json({ success: true });
+  } catch (e: any) {
+    console.error('send-schedule-report error:', e?.message || e);
+    return res.status(500).json({ error: e?.message || 'Failed to send scheduled report' });
+  }
+}

@@ -24,3 +24,15 @@ export const useClientStore = create<ClientStore>((set) => ({
   clientId: null,
   setClientId: (id) => set({ clientId: id }),
 }));
+
+interface CustomerContextStore {
+  customerUid: string | null;
+  customerName: string | null;
+  setCustomer: (uid: string | null, name?: string | null) => void;
+}
+
+export const useCustomerStore = create<CustomerContextStore>((set) => ({
+  customerUid: null,
+  customerName: null,
+  setCustomer: (uid, name) => set({ customerUid: uid, customerName: name ?? null }),
+}));

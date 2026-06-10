@@ -19,5 +19,10 @@
     "concurrently": "^8.0.0",
     "typescript": "^5.0.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
+    "mongoose": "^9.7.0"
+  }
 }
