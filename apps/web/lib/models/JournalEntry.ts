@@ -4,7 +4,9 @@ export interface IJournalEntry extends Document {
   userId: string;
   date: string;
   description: string;
-  jobId?: string;
+  jobId: string;
+  reconciled: boolean;
+  reconciledAt: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -14,6 +16,8 @@ const JournalEntrySchema = new Schema<IJournalEntry>({
   date: { type: String, required: true },
   description: { type: String, default: '' },
   jobId: { type: String, default: null },
+  reconciled: { type: Boolean, default: false },
+  reconciledAt: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

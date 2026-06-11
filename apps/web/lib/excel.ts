@@ -43,7 +43,8 @@ function sectionStyle(color: string): Partial<ExcelJS.Style> {
 function applyZebra(row: ExcelJS.Row, even: boolean, color: string) {
   if (even) {
     row.eachCell({ includeEmpty: true }, (cell) => {
-      if (!cell.style.fill?.fgColor?.argb || cell.style.fill.fgColor.argb === '00000000') {
+      const fill = cell.style.fill;
+      if (fill?.type === 'pattern' && (!fill.fgColor?.argb || fill.fgColor.argb === '00000000')) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
       }
     });
@@ -73,8 +74,8 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   if (endDate) query.date = { ...query.date, $lte: endDate };
 
   const entriesData = await JournalEntry.find(query).sort({ date: -1 }).lean();
-  const entryIds = entriesData.map(e => e._id.toString());
-  const entriesMap = new Map(entriesData.map(e => [e._id.toString(), e]));
+  const entryIds = entriesData.map(e => (e._id as string).toString());
+  const entriesMap = new Map(entriesData.map(e => [(e._id as string).toString(), e]));
 
   const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
   const accountMap = new Map<string, AccountInfo>();
@@ -107,7 +108,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     const month = (entry.date || '').slice(0, 7);
     if (!month) continue;
     const mTotals = monthlyTotals.get(month) || { revenue: 0, expenses: 0 };
-    const lines = linesByEntry.get(entry._id.toString()) || [];
+    const lines = linesByEntry.get((entry as any)._id.toString()) || [];
     for (const line of lines) {
       const info = accountMap.get(line.accountCode);
       if (!info) continue;
@@ -282,7 +283,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     linesByEntryId.set(line.journalEntryId, existing);
   }
   for (const entry of entriesData) {
-    const eid = entry._id.toString();
+    const eid = (entry as any)._id.toString();
     const lines = linesByEntryId.get(eid) || [];
     lines.forEach((line: any, idx: number) => {
       const rr = td.getRow(row);
@@ -378,7 +379,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     gjLinesById.set(line.journalEntryId, existing);
   }
   for (const entry of entriesData) {
-    const eid = entry._id.toString();
+    const eid = (entry as any)._id.toString();
     const lines = gjLinesById.get(eid) || [];
     lines.forEach((line: any) => {
       const rr = gj.getRow(row);
@@ -558,18 +559,10 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   // Data bars on Revenue and Expenses columns
   if (vaRow > 2) {
     const revEnd = vaRow - 1;
-    va.addConditionalFormatting({
-      ref: `B2:B${revEnd}`,
-      rules: [{ type: 'dataBar', priority: 1, dataBar: { color: { argb: palette.revenue }, showValue: true } }],
-    });
-    va.addConditionalFormatting({
-      ref: `C2:C${revEnd}`,
-      rules: [{ type: 'dataBar', priority: 1, dataBar: { color: { argb: palette.expense }, showValue: true } }],
-    });
-    va.addConditionalFormatting({
-      ref: `D2:D${revEnd}`,
-      rules: [{ type: 'dataBar', priority: 1, dataBar: { color: { argb: palette.accentGreen }, showValue: true } }],
-    });
+    const dataBarRule = (color: string) => ({ type: 'dataBar', priority: 1, dataBar: { color: { argb: color }, showValue: true } }) as any;
+    va.addConditionalFormatting({ ref: `B2:B${revEnd}`, rules: [dataBarRule(palette.revenue)] });
+    va.addConditionalFormatting({ ref: `C2:C${revEnd}`, rules: [dataBarRule(palette.expense)] });
+    va.addConditionalFormatting({ ref: `D2:D${revEnd}`, rules: [dataBarRule(palette.accentGreen)] });
   }
 
   // Top expenses breakdown
@@ -602,7 +595,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   if (topExpenses.length > 0) {
     va.addConditionalFormatting({
       ref: `G${expStart}:G${expEnd}`,
-      rules: [{ type: 'dataBar', priority: 1, dataBar: { color: { argb: palette.accentRed }, showValue: true } }],
+      rules: [{ type: 'dataBar', priority: 1, dataBar: { color: { argb: palette.accentRed }, showValue: true } } as any],
     });
   }
 

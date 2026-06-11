@@ -161,8 +161,8 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
       const res = await fetch(`/api/import-jobs/${jobId}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
-        setHistory(prev => prev.filter(j => j.id !== jobId));
-        if (job?.id === jobId) reset();
+        setHistory(prev => prev.filter(j => j._id !== jobId));
+        if (job?._id === jobId) reset();
       } else {
         alert('Delete failed: ' + (json.error || 'unknown error'));
       }
@@ -829,8 +829,8 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
         </>
       )}
       <Button type="button" variant="secondary" onClick={reset}>Import Another File</Button>
-      <Button type="button" variant="danger" onClick={() => job?.id && handleDeleteJob(job.id)} disabled={deletingId === job?.id}>
-        {deletingId === job?.id ? 'Deleting...' : 'Delete This Import'}
+      <Button type="button" variant="danger" onClick={() => job?._id && handleDeleteJob(job._id)} disabled={deletingId === job?._id}>
+        {deletingId === job?._id ? 'Deleting...' : 'Delete This Import'}
       </Button>
     </div>
   );
@@ -900,13 +900,13 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
         {historyOpen && !historyLoading && history.length > 0 && (
           <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
             {history.map(h => (
-              <div key={h.id} className="flex items-center justify-between p-3 bg-surface-50 rounded-lg border border-surface-200 text-sm">
+              <div key={h._id} className="flex items-center justify-between p-3 bg-surface-50 rounded-lg border border-surface-200 text-sm">
                 <div>
                   <p className="font-medium text-surface-800">{h.fileName}</p>
                   <p className="text-surface-500">{new Date(h.createdAt).toLocaleDateString()} &middot; {(h.importedEntries || h.processedRows || 0).toLocaleString()} entries</p>
                 </div>
-                <Button variant="danger" size="sm" onClick={() => handleDeleteJob(h.id)} disabled={deletingId === h.id}>
-                  {deletingId === h.id ? '...' : 'Delete'}
+                <Button variant="danger" size="sm" onClick={() => handleDeleteJob(h._id)} disabled={deletingId === h._id}>
+                  {deletingId === h._id ? '...' : 'Delete'}
                 </Button>
               </div>
             ))}

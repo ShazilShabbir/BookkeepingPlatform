@@ -21,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (endDate) query.date = { ...query.date, $lte: endDate as string };
 
     const entries = await JournalEntry.find(query).select('_id').lean();
-    const entryIds = entries.map(e => e._id.toString());
+    const entryIds = entries.map(e => (e as any)._id.toString());
 
     const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
     const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();

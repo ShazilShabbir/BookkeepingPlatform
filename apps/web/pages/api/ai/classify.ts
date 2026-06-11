@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongoose';
 import Account from '@/lib/models/Account';
 import { classifyTransactions } from '@/lib/ai';
 import { classifyRow } from '@/lib/classify';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 function buildAccountMap(accounts: any[]): Map<string, { code: string; name: string; type: string }> {
   const map = new Map<string, { code: string; name: string; type: string }>();
@@ -17,6 +18,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = token.sub!;
+
+  const { allowed } = await checkFeatureAccess(uid!, 'ai-classify');
+  if (!allowed) return res.status(403).json({ error: 'AI classification requires Pro plan or higher. Visit /pricing to upgrade.', code: 'UPGRADE_REQUIRED' });
 
   const { transactions, columnMapping } = req.body;
   if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {

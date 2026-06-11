@@ -189,6 +189,7 @@ export interface ColumnMapping {
 }
 
 export interface ImportJob {
+  _id: string;
   userId: string;
   fileName: string;
   filePath: string;

@@ -283,3 +283,7 @@ export default function PublicReport() {
     </div>
   );
 }
+
+export function getServerSideProps() {
+  return { props: {} };
+}

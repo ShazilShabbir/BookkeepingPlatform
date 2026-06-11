@@ -43,7 +43,7 @@ export async function getFinancialStatements(
   if (endDate) query.date = { ...query.date, $lte: endDate };
 
   const entries = await JournalEntry.find(query).select('_id').lean();
-  const entryIds = entries.map(e => e._id.toString());
+  const entryIds = entries.map(e => (e as any)._id.toString());
 
   const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId }).lean();
   const accountTotals = new Map<string, { debits: number; credits: number }>();

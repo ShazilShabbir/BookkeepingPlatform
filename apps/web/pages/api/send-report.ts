@@ -5,6 +5,7 @@ import { generateWorkbook } from '@/lib/excel';
 import User from '@/lib/models/User';
 import Client from '@/lib/models/Client';
 import dbConnect from '@/lib/mongoose';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -12,6 +13,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = token.sub!;
+
+  const { allowed } = await checkFeatureAccess(uid!, 'email-reports');
+  if (!allowed) return res.status(403).json({ error: 'Email reports requires Pro plan or higher. Visit /pricing to upgrade.', code: 'UPGRADE_REQUIRED' });
 
   await dbConnect();
 
@@ -33,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { Resend } = await import('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const base64 = buffer.toString('base64');
+    const base64 = (buffer as any).toString('base64');
     const dateLabel = startDate && endDate ? `${startDate} to ${endDate}` : 'All Time';
 
     await resend.emails.send({

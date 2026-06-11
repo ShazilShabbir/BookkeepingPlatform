@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/lib/models/Client';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -9,6 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const uid = token.sub!;
 
   await dbConnect();
+
+  const { allowed } = await checkFeatureAccess(uid!, 'share-links');
+  if (!allowed) return res.status(403).json({ error: 'Share links requires Pro plan or higher. Visit /pricing to upgrade.', code: 'UPGRADE_REQUIRED' });
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 

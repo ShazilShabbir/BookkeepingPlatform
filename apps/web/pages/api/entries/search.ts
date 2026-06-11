@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const results = [];
     for (const entry of entries) {
-      const lines = await JournalLine.find({ journalEntryId: entry._id.toString(), userId: uid }).lean();
+      const lines = await JournalLine.find({ journalEntryId: (entry as any)._id.toString(), userId: uid }).lean();
       results.push({ ...entry, lines });
     }
 

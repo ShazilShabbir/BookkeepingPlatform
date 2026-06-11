@@ -5,13 +5,16 @@ import ImportCSV from '@/components/ImportCSV';
 import SearchEntries from '@/components/SearchEntries';
 import ManageCustomers from '@/components/ManageCustomers';
 import UnifiedDashboard from '@/components/UnifiedDashboard';
+import Reconcile from '@/components/Reconcile';
 import { Tabs } from '@/components/ui';
+import Head from 'next/head';
 
 const tabItems = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'import', label: 'Import' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'customers', label: 'Customers' },
+  { id: 'reconciliation', label: 'Reconciliation' },
 ];
 
 export default function Dashboard() {
@@ -25,7 +28,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ['import', 'transactions', 'customers'].includes(tab)) {
+    if (tab && ['import', 'transactions', 'customers', 'reconciliation'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
@@ -45,7 +48,12 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="py-8 animate-fade-in">
+    <>
+      <Head>
+        <title>Dashboard | BookKeep</title>
+        <meta name="robots" content="noindex" />
+      </Head>
+      <div className="py-8 animate-fade-in">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -91,7 +99,23 @@ export default function Dashboard() {
             <ManageCustomers />
           </div>
         )}
+
+        {activeTab === 'reconciliation' && (
+          <div className="animate-fade-in">
+            {customerUid && (
+              <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                Reconciling data for <strong>{customerName}</strong>
+              </div>
+            )}
+            <Reconcile userId={effectiveUserId} />
+          </div>
+        )}
       </div>
     </div>
+    </>
   );
+}
+
+export function getServerSideProps() {
+  return { props: {} };
 }

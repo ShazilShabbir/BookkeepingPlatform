@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Button, Input, Card } from '@/components/ui';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import Head from 'next/head';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -80,7 +81,12 @@ export default function Signup() {
   const strength = password ? getPasswordStrength(password) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface-50 to-surface-100 flex items-center justify-center py-12 px-4">
+    <>
+      <Head>
+        <title>Get Started | BookKeep</title>
+        <meta name="description" content="Create your free BookKeep account. No credit card required. Start tracking your finances in minutes." />
+      </Head>
+      <div className="min-h-screen bg-gradient-to-br from-surface-50 to-surface-100 flex items-center justify-center py-12 px-4">
       <Card padding="lg" className="w-full max-w-md animate-scale-in">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary-50 text-primary-600 mb-4">
@@ -172,5 +178,10 @@ export default function Signup() {
         </p>
       </Card>
     </div>
+    </>
   );
+}
+
+export function getServerSideProps() {
+  return { props: {} };
 }

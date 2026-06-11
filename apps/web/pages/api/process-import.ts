@@ -8,6 +8,7 @@ import Account from '@/lib/models/Account';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import CategoryMapping from '@/lib/models/CategoryMapping';
 import { KEYWORD_RULES, classifyRow, cleanDate } from '@/lib/classify';
+import { checkEntryLimit } from '@/lib/subscription';
 import Papa from 'papaparse';
 import { readFileSync, unlinkSync, existsSync } from 'fs';
 
@@ -61,6 +62,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = token.sub!;
+
+  const { allowed, limit, used } = await checkEntryLimit(uid!);
+  if (!allowed) return res.status(403).json({ error: `Monthly entry limit reached (${used}/${limit}). Upgrade to continue.`, code: 'LIMIT_REACHED', upgradeUrl: '/pricing' });
 
   const { jobId } = req.body;
   if (!jobId) return res.status(400).json({ error: 'jobId required' });

@@ -4,12 +4,7 @@ export default class MyDocument extends Document {
   render() {
     return (
       <Html lang="en">
-        <Head>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-          <meta name="description" content="Real-time sales analytics and bookkeeping platform for your business" />
-          <meta name="theme-color" content="#4f46e5" />
-        </Head>
+        <Head />
         <body>
           <Main />
           <NextScript />

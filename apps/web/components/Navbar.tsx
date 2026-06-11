@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import { useRouter } from 'next/router';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import { useUserStore } from '@/lib/store';
 import CustomerSwitcher from '@/components/CustomerSwitcher';
+import SubscriptionBadge from '@/components/SubscriptionBadge';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/billing', label: 'Billing' },
 ];
 
-export default function Navbar() {
-  const router = useRouter();
+export default function Navbar({ pathname }: { pathname: string }) {
   const user = useUserStore((state) => state.user);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -25,7 +25,7 @@ export default function Navbar() {
     }
   };
 
-  const isActive = (href: string) => router.pathname === '/dashboard';
+  const isActive = (href: string) => pathname === '/dashboard';
 
   return (
     <nav className="bg-white border-b border-surface-200 sticky top-0 z-50">
@@ -58,7 +58,7 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
-            {user && router.pathname === '/dashboard' && (
+            {user && pathname === '/dashboard' && (
               <CustomerSwitcher />
             )}
             {user && (
@@ -84,6 +84,7 @@ export default function Navbar() {
                     <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-elevated border border-surface-200 py-1 z-20 animate-scale-in">
                       <div className="px-4 py-2 border-b border-surface-100">
                         <p className="text-sm font-medium text-surface-900 truncate">{user.email}</p>
+                        <div className="mt-1"><SubscriptionBadge /></div>
                       </div>
                       <button
                         onClick={handleLogout}
