@@ -17,9 +17,9 @@ export default function LandingCTA() {
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-4">
           <a href="/signup">
-            <Button size="lg" className="bg-white text-surface-900 hover:bg-surface-100 shadow-lg shadow-primary-500/20">
-              Get started free
-            </Button>
+            <Button size="lg" className="bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-400 hover:to-primary-500 shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-300">
+                  Get started free
+                </Button>
           </a>
           <a href="/pricing">
             <Button size="lg" variant="ghost" className="text-white hover:bg-white/10 border border-white/10">
