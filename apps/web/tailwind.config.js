@@ -50,6 +50,11 @@ module.exports = {
         'slide-down': 'slideDown 0.3s ease-out',
         'scale-in': 'scaleIn 0.2s ease-out',
         'skeleton': 'skeleton 1.5s infinite',
+        'float': 'float 3s ease-in-out infinite',
+        'float-slow': 'float 5s ease-in-out infinite',
+        'bar-grow': 'barGrow 1.5s ease-out forwards',
+        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+        'drift': 'drift 8s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -71,6 +76,26 @@ module.exports = {
         skeleton: {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        floatSlow: {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+        barGrow: {
+          '0%': { width: '0%' },
+        },
+        glowPulse: {
+          '0%, 100%': { opacity: '0.4' },
+          '50%': { opacity: '0.8' },
+        },
+        drift: {
+          '0%, 100%': { transform: 'translate(0px, 0px)' },
+          '33%': { transform: 'translate(10px, -10px)' },
+          '66%': { transform: 'translate(-5px, 5px)' },
         },
       },
     },
