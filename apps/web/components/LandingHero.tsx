@@ -40,7 +40,7 @@ export default function LandingHero() {
 
             <div className="mt-10 flex flex-wrap gap-4">
               <a href="/signup">
-                <Button size="lg" className="bg-white text-surface-900 hover:bg-surface-100 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-shadow duration-300">
+                <Button size="lg" className="bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-400 hover:to-primary-500 shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-300">
                   Get started free
                 </Button>
               </a>
