@@ -4,6 +4,7 @@ import { SessionProvider, useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 import { useUserStore } from '@/lib/store';
 import Navbar from '@/components/Navbar';
+import LandingNavbar from '@/components/LandingNavbar';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ui';
 import Head from 'next/head';
@@ -83,7 +84,7 @@ function MyApp({ Component, pageProps: { session, ...pageProps }, router }: AppP
           }}
         />
         <div className="min-h-screen flex flex-col">
-          {!isAuthPage && <Navbar pathname={router.pathname} />}
+          {!isAuthPage && router.pathname === '/' ? <LandingNavbar /> : !isAuthPage && <Navbar pathname={router.pathname} />}
           <main className="flex-1">
             <ErrorBoundary>
               <Component {...pageProps} />

@@ -71,11 +71,11 @@ export default function Home() {
       </Head>
       <div className="min-h-screen">
         <LandingHero />
-        <div id="features"><LandingFeatures /></div>
-        <LandingHowItWorks />
-        <div id="pricing"><LandingPricing /></div>
-        <LandingTestimonials />
-        <div id="faq"><LandingFAQ /></div>
+        <div id="features" className="scroll-mt-20"><LandingFeatures /></div>
+        <div className="scroll-mt-20"><LandingHowItWorks /></div>
+        <div id="pricing" className="scroll-mt-20"><LandingPricing /></div>
+        <div className="scroll-mt-20"><LandingTestimonials /></div>
+        <div id="faq" className="scroll-mt-20"><LandingFAQ /></div>
         <LandingCTA />
         <Footer />
       </div>
