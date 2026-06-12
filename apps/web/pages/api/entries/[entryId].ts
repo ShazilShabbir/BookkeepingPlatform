@@ -5,6 +5,7 @@ import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import mongoose from 'mongoose';
+import { logAction, trashItem } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -38,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       $set: { date, description: description || '', updatedAt: new Date() },
     });
 
+    await logAction({ userId: uid, action: 'update', resource: 'entry', resourceId: entryId, details: { date, description }, req });
     return res.status(200).json({ success: true });
   }
 
@@ -47,6 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const closed = await ClosedPeriod.findOne({ userId: uid, yearMonth: period });
       if (closed) return res.status(403).json({ error: 'Cannot delete entries in a closed period' });
     }
+
+    const lines = await JournalLine.find({ journalEntryId: entryId, userId: uid }).lean();
+    await trashItem({
+      userId: uid,
+      resource: 'entry',
+      resourceId: entryId,
+      label: (entry as any).description || 'Journal entry',
+      snapshot: { entry, lines },
+    });
 
     const session = await mongoose.startSession();
     try {
@@ -61,6 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       session.endSession();
     }
 
+    await logAction({ userId: uid, action: 'delete', resource: 'entry', resourceId: entryId, details: { date: (entry as any).date }, req });
     return res.status(200).json({ success: true });
   }
 

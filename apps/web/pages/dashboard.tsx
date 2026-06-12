@@ -1,23 +1,39 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useUserStore, useCustomerStore } from '@/lib/store';
 import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 import ImportCSV from '@/components/ImportCSV';
 import SearchEntries from '@/components/SearchEntries';
 import ManageCustomers from '@/components/ManageCustomers';
 import UnifiedDashboard from '@/components/UnifiedDashboard';
 import Reconcile from '@/components/Reconcile';
+import ChartOfAccounts from '@/components/ChartOfAccounts';
+import ReclassifyEntries from '@/components/ReclassifyEntries';
+import PeriodClose from '@/components/PeriodClose';
+import ReportPanel from '@/components/ReportPanel';
+import ScheduleManager from '@/components/ScheduleManager';
+import ClientManager from '@/components/ClientManager';
+import TrashPanel from '@/components/TrashPanel';
 import { Tabs } from '@/components/ui';
 import Head from 'next/head';
 
 const tabItems = [
   { id: 'dashboard', label: 'Dashboard' },
+  { id: 'accounts', label: 'Chart of Accounts' },
+  { id: 'reclassify', label: 'Reclassify' },
   { id: 'import', label: 'Import' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'customers', label: 'Customers' },
   { id: 'reconciliation', label: 'Reconciliation' },
+  { id: 'period-close', label: 'Period Close' },
+  { id: 'reports', label: 'Reports' },
+  { id: 'schedules', label: 'Schedules' },
+  { id: 'clients', label: 'Clients' },
+  { id: 'trash', label: 'Trash' },
 ];
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
   const user = useUserStore((state) => state.user);
   const customerUid = useCustomerStore((state) => state.customerUid);
   const customerName = useCustomerStore((state) => state.customerName);
@@ -28,18 +44,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ['import', 'transactions', 'customers', 'reconciliation'].includes(tab)) {
+    if (tab && ['accounts', 'reclassify', 'import', 'transactions', 'customers', 'reconciliation', 'period-close', 'reports', 'schedules', 'clients', 'trash'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
 
   useEffect(() => {
-    if (!user) {
+    if (status === 'unauthenticated') {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [status, router]);
 
-  if (!user) {
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (!session || !user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full" />
@@ -72,6 +96,18 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === 'accounts' && (
+          <div className="animate-fade-in">
+            <ChartOfAccounts />
+          </div>
+        )}
+
+        {activeTab === 'reclassify' && (
+          <div className="animate-fade-in">
+            <ReclassifyEntries />
+          </div>
+        )}
+
         {activeTab === 'import' && (
           <div className="animate-fade-in">
             {customerUid && (
@@ -100,6 +136,36 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === 'period-close' && (
+          <div className="animate-fade-in">
+            <PeriodClose />
+          </div>
+        )}
+
+        {activeTab === 'reports' && (
+          <div className="animate-fade-in">
+            <ReportPanel />
+          </div>
+        )}
+
+        {activeTab === 'schedules' && (
+          <div className="animate-fade-in">
+            <ScheduleManager />
+          </div>
+        )}
+
+        {activeTab === 'clients' && (
+          <div className="animate-fade-in">
+            <ClientManager />
+          </div>
+        )}
+
+        {activeTab === 'trash' && (
+          <div className="animate-fade-in">
+            <TrashPanel />
+          </div>
+        )}
+
         {activeTab === 'reconciliation' && (
           <div className="animate-fade-in">
             {customerUid && (
@@ -116,6 +182,4 @@ export default function Dashboard() {
   );
 }
 
-export function getServerSideProps() {
-  return { props: {} };
-}
+export { getServerSession as getServerSideProps } from '@/lib/getServerSession';

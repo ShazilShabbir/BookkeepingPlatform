@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Account from '@/lib/models/Account';
+import { logAction } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -30,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       normalBalance: normalBalance || 'debit',
       isActive: true,
     });
+    await logAction({ userId: uid, action: 'create', resource: 'account', resourceId: code, details: { name, type }, req });
     return res.status(201).json({ success: true, data: account.toObject() });
   }
 

@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt';
 import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
+import { logAction } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -58,6 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: new Date(),
       });
 
+      await logAction({ userId: uid, action: 'create', resource: 'customer', resourceId: customer._id.toString(), details: { name, email }, req });
       return res.status(201).json({
         success: true,
         data: { uid: customer._id.toString(), email, name },
@@ -91,6 +93,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       await User.findByIdAndDelete(customerUid);
+      await logAction({ userId: uid, action: 'delete', resource: 'customer', resourceId: customerUid, req });
       return res.status(200).json({ success: true });
     }
 

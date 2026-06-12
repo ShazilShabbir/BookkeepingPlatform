@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Account from '@/lib/models/Account';
+import { logAction } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -33,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       { new: true }
     ).lean();
     if (!account) return res.status(404).json({ error: 'Account not found' });
+    await logAction({ userId: uid, action: 'update', resource: 'account', resourceId: code, details: update, req });
     return res.status(200).json({ success: true, data: account });
   }
 

@@ -8,7 +8,7 @@
     "build": "echo 'No build needed for serverless functions'"
   },
   "dependencies": {
-    "firebase": "^12.14.0",
+    "mongoose": "^8.0.0",
     "axios": "^1.6.0",
     "resend": "^3.0.0"
   }

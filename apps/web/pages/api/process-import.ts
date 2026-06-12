@@ -183,27 +183,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (excludedSet.has(absRow)) { skippedRows++; continue; }
 
-        const dateVal = dateCol ? cleanDate(row[dateCol] || '') : '';
+        const today = new Date().toISOString().split('T')[0];
+        const dateVal = dateCol ? (cleanDate(row[dateCol] || '') || today) : today;
         const amountVal = amountCol ? cleanNumber(row[amountCol] || '0') : 0;
         const costVal = costCol ? cleanNumber(row[costCol] || '0') : 0;
         const descVal = descCol ? (row[descCol] || '').trim() : '';
         const catCol = mapping.categoryColumn;
         const catVal = (catCol ? (row[catCol] || '') : '').trim().toLowerCase() || 'uncategorized';
 
-        if (!dateVal && !amountVal && !costVal) { skippedRows++; continue; }
+        if (!amountVal && !costVal) { skippedRows++; continue; }
 
         if (dedupEnabled && descVal && dateVal) {
           let existing: string[] = [];
           if (dedupCache.has(dateVal)) {
             existing = dedupCache.get(dateVal)!;
           } else {
-            const existingLines = await JournalLine.find({ userId: uid })
-              .populate({ path: 'journalEntryId', match: { date: dateVal }, select: 'description' })
-              .lean();
-            existing = (existingLines as any).map((l: any) => {
-              const desc = l.description || '';
-              return desc ? desc.toLowerCase() : '';
-            }).filter(Boolean);
+            const entryDocs = await JournalEntry.find({ userId: uid, date: dateVal }, { description: 1 }).lean();
+            const entryIds = entryDocs.map(e => e._id.toString());
+            const lineDocs = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }, { description: 1 }).lean();
+            const descs = [...entryDocs.map(e => e.description), ...lineDocs.map(l => l.description || '')];
+            existing = descs.map(d => d.toLowerCase()).filter(Boolean);
             dedupCache.set(dateVal, existing);
           }
           const matchedDesc = existing.find((ex: string) => similarity(descVal.toLowerCase(), ex) >= DEDUP_THRESHOLD);
@@ -314,8 +313,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true, data: { jobId, status: 'completed', totalRows: allRows.length, importedEntries, skippedRows, duplicatesSkipped, uncategorizedEntries, errors: errors.length },
     });
   } catch (error: any) {
-    await ImportJob.findByIdAndUpdate(jobId, { $set: { status: 'failed', errors: [{ row: 0, reason: 'Import failed' }], completedAt: new Date() } }).catch(() => {});
-    console.error('process-import error:', error?.message || error);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
+    const errMsg = error?.message || error?.toString() || 'Unknown error';
+    await ImportJob.findByIdAndUpdate(jobId, { $set: { status: 'failed', errors: [{ row: 0, reason: errMsg }], completedAt: new Date() } }).catch(() => {});
+    console.error('process-import error:', errMsg, error?.stack || '');
+    return res.status(500).json({ success: false, error: errMsg });
   }
 }

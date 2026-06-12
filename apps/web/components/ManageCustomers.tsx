@@ -104,7 +104,7 @@ export default function ManageCustomers() {
       <Card padding="lg">
         <h2 className="text-lg font-semibold text-surface-900 mb-2">Manage Customers</h2>
         <p className="text-sm text-surface-500 mb-6">
-          Create customer accounts. Each customer gets their own Firebase Auth account with isolated data.
+          Create customer accounts. Each customer gets their own MongoDB account with isolated data.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <Input placeholder="Business name" value={name} onChange={(e) => setName(e.target.value)} />

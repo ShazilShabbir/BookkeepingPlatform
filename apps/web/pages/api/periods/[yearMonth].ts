@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
+import { logAction } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -24,12 +25,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       closedBy: uid,
     });
 
+    await logAction({ userId: uid, action: 'close', resource: 'period', resourceId: yearMonth, req });
     return res.status(200).json({ success: true, data: { yearMonth, closed: true } });
   }
 
   if (req.method === 'DELETE') {
     const result = await ClosedPeriod.findOneAndDelete({ userId: uid, yearMonth });
     if (!result) return res.status(404).json({ error: 'Period not found' });
+    await logAction({ userId: uid, action: 'reopen', resource: 'period', resourceId: yearMonth, req });
     return res.status(200).json({ success: true, data: { yearMonth, closed: false } });
   }
 

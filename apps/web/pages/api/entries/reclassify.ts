@@ -1,11 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
-import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
-import Account from '@/lib/models/Account';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import mongoose from 'mongoose';
+import { logAction } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -45,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await line.save({ session });
 
     await session.commitTransaction();
+    await logAction({ userId: uid, action: 'reclassify', resource: 'entry', resourceId: entryId, details: { lineId, oldCode: line.accountCode, newCode: newAccountCode }, req });
     return res.status(200).json({ success: true, data: { oldCode, newCode: newAccountCode } });
   } catch (e: any) {
     await session.abortTransaction();

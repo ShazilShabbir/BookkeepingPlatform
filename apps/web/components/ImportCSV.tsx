@@ -95,7 +95,7 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
         const res = await fetch(`/api/import-jobs/${processingJobId}`);
         const json = await res.json();
         if (json.success) {
-          const data = json.data as ImportJob;
+          const data = (json.data?.job || json.data) as ImportJob;
           setJob(data);
           if (data.status === 'completed') setStep('completed');
           else if (data.status === 'failed') setStep('failed');
@@ -341,7 +341,9 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
           }),
         });
         const classifyJson = await classifyRes.json();
-        if (classifyJson.success && classifyJson.data) {
+        if (classifyJson.code === 'UPGRADE_REQUIRED') {
+          setClassifiedCount(0);
+        } else if (classifyJson.success && classifyJson.data) {
           const mappings: Record<string, string> = {};
           for (const item of classifyJson.data) {
             if (item.description && item.accountCode) {
@@ -615,23 +617,40 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
           </div>
         )}
 
-        <div className="p-4 bg-primary-50 rounded-xl border border-primary-200">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-lg font-bold text-primary-700">{classifiedCount.toLocaleString()}</span>
-            <span className="text-sm text-primary-600">rows auto-classified by AI</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-primary-500">
-            <span className="inline-block px-2 py-0.5 bg-primary-100 rounded-full font-medium">Contra: Cash (1000)</span>
-            <span>— offset account for all journal entries</span>
-          </div>
-          {generatedAccounts.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-primary-500 font-medium mr-1">✨ AI generated:</span>
-              {generatedAccounts.map(a => (
-                <span key={a.code} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
-                  {a.code} {a.name}
-                </span>
-              ))}
+        <div className={`p-4 rounded-xl border ${classifiedCount > 0 ? 'bg-primary-50 border-primary-200' : 'bg-amber-50 border-amber-200'}`}>
+          {classifiedCount > 0 ? (
+            <>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-lg font-bold text-primary-700">{classifiedCount.toLocaleString()}</span>
+                <span className="text-sm text-primary-600">rows auto-classified by AI</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-primary-500">
+                <span className="inline-block px-2 py-0.5 bg-primary-100 rounded-full font-medium">Contra: Cash (1000)</span>
+                <span>— offset account for all journal entries</span>
+              </div>
+              {generatedAccounts.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="text-xs text-primary-500 font-medium mr-1">✨ AI generated:</span>
+                  {generatedAccounts.map(a => (
+                    <span key={a.code} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                      {a.code} {a.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-amber-800">AI classification requires Pro plan</p>
+                <p className="text-xs text-amber-600 mt-0.5">Upgrade to auto-classify transactions. You can still import and manually categorize them.</p>
+              </div>
+              <a
+                href="/pricing"
+                className="shrink-0 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-primary-600 rounded-lg hover:from-primary-400 hover:to-primary-500 transition-all duration-300"
+              >
+                Upgrade
+              </a>
             </div>
           )}
         </div>

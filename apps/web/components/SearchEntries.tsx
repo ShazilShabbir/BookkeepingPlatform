@@ -8,26 +8,40 @@ interface AccountOption {
   type: string;
 }
 
-interface RawDataEntry {
-  id: string;
+interface JournalLineData {
+  _id: string;
+  accountCode: string;
+  description: string;
+  debit: number;
+  credit: number;
+}
+
+interface JournalEntryData {
+  _id: string;
+  userId: string;
   date: string;
   description: string;
-  category: string;
-  amount: number;
-  type: string;
-  note?: string;
-  source: string;
-  matchedFields: string[];
-  rawData: Record<string, string>;
-  importedAt?: string;
+  lines: JournalLineData[];
 }
 
 interface SearchResponse {
-  entries: RawDataEntry[];
+  success: boolean;
+  data: JournalEntryData[];
+  page: number;
+  pageSize: number;
+  total: number;
   hasMore: boolean;
-  cursor: string | null;
-  totalRead: number;
-  totalReturned: number;
+}
+
+interface DisplayEntry {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  category: string;
+  lineCount: number;
+  lines: JournalLineData[];
 }
 
 export default function SearchEntries({ userId }: { userId: string }) {
@@ -35,15 +49,15 @@ export default function SearchEntries({ userId }: { userId: string }) {
   const [typeFilter, setTypeFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [entries, setEntries] = useState<RawDataEntry[]>([]);
+  const [entries, setEntries] = useState<DisplayEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [totalRead, setTotalRead] = useState(0);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ date: '', description: '', accountCode: '', accountName: '', accountType: '' });
+  const [editForm, setEditForm] = useState({ date: '', description: '' });
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,81 +73,61 @@ export default function SearchEntries({ userId }: { userId: string }) {
     loadAccounts();
   }, []);
 
-  const startEdit = (entry: RawDataEntry) => {
-    setEditingId(entry.id);
-    setEditForm({
+  const accountTypeMap = new Map(accounts.map(a => [a.code, a.type]));
+
+  const toDisplayEntry = (entry: JournalEntryData): DisplayEntry => {
+    let totalDebit = 0;
+    let totalCredit = 0;
+    const codes = new Set<string>();
+    for (const line of entry.lines) {
+      totalDebit += line.debit || 0;
+      totalCredit += line.credit || 0;
+      if (line.accountCode) codes.add(line.accountCode);
+    }
+
+    const types = new Set<string>();
+    for (const code of codes) {
+      const t = accountTypeMap.get(code);
+      if (t) types.add(t);
+    }
+
+    const isExpense = types.has('expense') && !types.has('revenue');
+    const amount = Math.max(totalDebit, totalCredit);
+    const cat = entry.lines.map(l => l.accountCode).filter(Boolean).join(', ') || 'Uncategorized';
+
+    return {
+      id: entry._id,
       date: entry.date,
       description: entry.description,
-      accountCode: '',
-      accountName: '',
-      accountType: '',
-    });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({ date: '', description: '', accountCode: '', accountName: '', accountType: '' });
-  };
-
-  const saveEdit = async (entryId: string) => {
-    setSaving(true);
-    try {
-      const body: Record<string, string> = {};
-      if (editForm.date) body.date = editForm.date;
-      if (editForm.description) body.description = editForm.description;
-      if (editForm.accountCode) {
-        body.accountCode = editForm.accountCode;
-        body.accountName = editForm.accountName;
-        body.accountType = editForm.accountType;
-      }
-      const res = await fetch(`/api/entries/${entryId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Save failed');
-      toast.success('Entry updated');
-      setEntries(prev => prev.map(e => {
-        if (e.id !== entryId) return e;
-        return {
-          ...e,
-          date: editForm.date || e.date,
-          description: editForm.description || e.description,
-        };
-      }));
-      cancelEdit();
-    } catch (err: any) {
-      toast.error(err.message || 'Save failed');
-    } finally {
-      setSaving(false);
-    }
+      amount: isExpense ? -amount : amount,
+      type: isExpense ? 'expense' : 'income',
+      category: cat,
+      lineCount: entry.lines.length,
+      lines: entry.lines,
+    };
   };
 
   const doSearch = useCallback(async (append = false) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/entries/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          query: query.trim(),
-          type: typeFilter || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-          pageSize: 50,
-          cursor: append ? cursor : null,
-        }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error || 'Search failed');
+      const currentPage = append ? page + 1 : 1;
+      const params = new URLSearchParams();
+      if (query.trim()) params.set('q', query.trim());
+      if (typeFilter) params.set('type', typeFilter);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      params.set('page', String(currentPage));
+      params.set('pageSize', '50');
 
-      const data: SearchResponse = json.data;
-      setEntries(prev => append ? [...prev, ...data.entries] : data.entries);
-      setHasMore(data.hasMore);
-      setCursor(data.cursor);
-      setTotalRead(prev => append ? prev + data.totalRead : data.totalRead);
+      const res = await fetch(`/api/entries/search?${params.toString()}`);
+      const json: SearchResponse = await res.json();
+      if (!json.success) throw new Error('Search failed');
+
+      const mapped = json.data.map(toDisplayEntry);
+      setEntries(prev => append ? [...prev, ...mapped] : mapped);
+      setHasMore(json.hasMore);
+      setPage(currentPage);
+      setTotal(json.total);
       setSearched(true);
     } catch (err: any) {
       toast.error(err.message || 'Search failed');
@@ -141,11 +135,11 @@ export default function SearchEntries({ userId }: { userId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [userId, query, typeFilter, startDate, endDate, cursor]);
+  }, [query, typeFilter, startDate, endDate, page, accounts]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCursor(null);
+    setPage(1);
     setEntries([]);
     doSearch(false);
   };
@@ -160,14 +154,64 @@ export default function SearchEntries({ userId }: { userId: string }) {
     setStartDate('');
     setEndDate('');
     setEntries([]);
-    setCursor(null);
+    setPage(1);
     setHasMore(false);
-    setTotalRead(0);
+    setTotal(0);
     setSearched(false);
     setExpandedRow(null);
     setEditingId(null);
-    setEditForm({ date: '', description: '', accountCode: '', accountName: '', accountType: '' });
+    setEditForm({ date: '', description: '' });
     if (inputRef.current) inputRef.current.focus();
+  };
+
+  const startEdit = (entry: DisplayEntry) => {
+    setEditingId(entry.id);
+    setEditForm({ date: entry.date, description: entry.description });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({ date: '', description: '' });
+  };
+
+  const saveEdit = async (entryId: string) => {
+    setSaving(true);
+    try {
+      const body: Record<string, string> = {};
+      if (editForm.date) body.date = editForm.date;
+      if (editForm.description) body.description = editForm.description;
+      const res = await fetch(`/api/entries/${entryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Save failed');
+      toast.success('Entry updated');
+      setEntries(prev => prev.map(e => {
+        if (e.id !== entryId) return e;
+        return { ...e, date: editForm.date || e.date, description: editForm.description || e.description };
+      }));
+      cancelEdit();
+    } catch (err: any) {
+      toast.error(err.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteEntry = async (entry: DisplayEntry) => {
+    if (!confirm('Delete this entry? This action cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/entries/${entry.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Delete failed');
+      toast.success('Entry deleted');
+      setEntries(prev => prev.filter(e => e.id !== entry.id));
+      setTotal(prev => prev - 1);
+    } catch (err: any) {
+      toast.error(err.message || 'Delete failed');
+    }
   };
 
   const formatAmount = (val: number) => {
@@ -189,7 +233,7 @@ export default function SearchEntries({ userId }: { userId: string }) {
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Search across all fields including raw CSV data..."
+                placeholder="Search descriptions, account codes, or account names..."
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-surface-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
               />
             </div>
@@ -246,8 +290,7 @@ export default function SearchEntries({ userId }: { userId: string }) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-surface-500">
-              {entries.length} result{entries.length !== 1 ? 's' : ''}
-              {totalRead > 0 && <span className="text-surface-400"> (scanned {totalRead} entries)</span>}
+              Showing {entries.length} of {total} result{total !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="space-y-2">
@@ -260,13 +303,7 @@ export default function SearchEntries({ userId }: { userId: string }) {
                   <div className="w-20 shrink-0 text-sm text-surface-600 font-mono">{entry.date}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-surface-900 truncate">{entry.description}</div>
-                    {entry.matchedFields.length > 0 && (
-                      <div className="flex gap-1 mt-0.5 flex-wrap">
-                        {entry.matchedFields.map(f => (
-                          <span key={f} className="text-[10px] bg-primary-50 text-primary-600 px-1.5 py-0.5 rounded">{f}</span>
-                        ))}
-                      </div>
-                    )}
+                    <div className="text-xs text-surface-400">{entry.lineCount} line{entry.lineCount !== 1 ? 's' : ''}</div>
                   </div>
                   <div className="text-right shrink-0">
                     <div className={`text-sm font-semibold ${entry.type === 'expense' ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -294,18 +331,6 @@ export default function SearchEntries({ userId }: { userId: string }) {
                               className="w-full text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white" />
                           </div>
                         </div>
-                        <div>
-                          <label className="text-xs text-surface-500 block mb-1">Account</label>
-                          <select value={editForm.accountCode} onChange={e => {
-                            const acct = accounts.find(a => a.code === e.target.value);
-                            setEditForm(f => ({ ...f, accountCode: e.target.value, accountName: acct?.name || '', accountType: acct?.type || '' }));
-                          }} className="w-full text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white">
-                            <option value="">Keep current account</option>
-                            {accounts.map(a => (
-                              <option key={a.code} value={a.code}>{a.code} - {a.name}</option>
-                            ))}
-                          </select>
-                        </div>
                         <div className="flex gap-2">
                           <Button size="sm" onClick={() => saveEdit(entry.id)} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
                           <Button size="sm" variant="secondary" onClick={cancelEdit}>Cancel</Button>
@@ -313,27 +338,32 @@ export default function SearchEntries({ userId }: { userId: string }) {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 text-xs">
-                          <div><span className="text-surface-400">Category:</span> <span className="text-surface-700">{entry.category}</span></div>
-                          <div><span className="text-surface-400">Source:</span> <span className="text-surface-700">{entry.source}</span></div>
-                          {entry.note && <div><span className="text-surface-400">Note:</span> <span className="text-surface-700">{entry.note}</span></div>}
-                          <div className="col-span-full">
-                            <details>
-                              <summary className="cursor-pointer text-primary-600 font-medium text-xs hover:underline">
-                                Raw Data ({Object.keys(entry.rawData).length} fields)
-                              </summary>
-                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
-                                {Object.entries(entry.rawData).map(([k, v]) => (
-                                  <div key={k} className="truncate">
-                                    <span className="text-surface-400">{k}:</span>{' '}
-                                    <span className="text-surface-600">{v}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </details>
-                          </div>
+                        <div className="overflow-x-auto border border-surface-200 rounded-lg">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-surface-100">
+                                <th className="py-1.5 px-3 text-left font-medium text-surface-600">Account</th>
+                                <th className="py-1.5 px-3 text-left font-medium text-surface-600">Description</th>
+                                <th className="py-1.5 px-3 text-right font-medium text-surface-600">Debit</th>
+                                <th className="py-1.5 px-3 text-right font-medium text-surface-600">Credit</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {entry.lines.map(line => (
+                                <tr key={line._id} className="border-t border-surface-100">
+                                  <td className="py-1.5 px-3 font-mono text-surface-500">{line.accountCode || '—'}</td>
+                                  <td className="py-1.5 px-3 text-surface-700">{line.description || '—'}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono text-surface-700">{(line.debit || 0).toFixed(2)}</td>
+                                  <td className="py-1.5 px-3 text-right font-mono text-surface-700">{(line.credit || 0).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => startEdit(entry)}>Edit</Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => startEdit(entry)}>Edit</Button>
+                          <Button size="sm" variant="ghost" onClick={() => deleteEntry(entry)} className="text-red-600 hover:text-red-700">Delete</Button>
+                        </div>
                       </div>
                     )}
                   </div>

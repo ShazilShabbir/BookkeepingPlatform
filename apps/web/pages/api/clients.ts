@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/lib/models/Client';
 import { checkFeatureAccess } from '@/lib/subscription';
+import { logAction } from '@/lib/audit';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -33,7 +34,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       name,
       accessToken,
     });
+    await logAction({ userId: uid, action: 'create', resource: 'client', resourceId: client._id.toString(), details: { name }, req });
     return res.status(201).json({ success: true, data: client.toObject() });
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    if (!id || Array.isArray(id)) return res.status(400).json({ error: 'id is required' });
+
+    const client = await Client.findOneAndDelete({ _id: id, userId: uid });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    await logAction({ userId: uid, action: 'delete', resource: 'client', resourceId: id, details: { name: (client as any).name }, req });
+    return res.status(200).json({ success: true });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });

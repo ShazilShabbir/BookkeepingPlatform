@@ -6,6 +6,7 @@ export interface IAccount extends Document {
   name: string;
   type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
   normalBalance: 'debit' | 'credit';
+  parentCode?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -17,6 +18,7 @@ const AccountSchema = new Schema<IAccount>({
   name: { type: String, required: true },
   type: { type: String, required: true, enum: ['asset', 'liability', 'equity', 'revenue', 'expense'] },
   normalBalance: { type: String, required: true, enum: ['debit', 'credit'], default: 'debit' },
+  parentCode: { type: String, default: null },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

@@ -18,17 +18,21 @@ export default function ShareButton({ disabled }: ShareButtonProps) {
     setLoading(true);
     try {
       const res = await fetch('/api/clients/share-link');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to load share link');
+      }
       const json = await res.json();
       if (json.success && json.data) {
         const baseUrl = window.location.origin;
         setShareUrl(`${baseUrl}/reports/${json.data.accessToken}`);
         setClientName(json.data.clientName || 'Client');
       } else {
-        setShareUrl('');
-        setClientName('');
+        throw new Error('Unexpected response');
       }
-    } catch {
-      toast.error('Failed to load share link');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load share link');
+      setOpen(false);
     } finally {
       setLoading(false);
     }

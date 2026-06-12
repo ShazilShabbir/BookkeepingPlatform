@@ -12,15 +12,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   await dbConnect();
 
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-  const q = (req.query.q as string) || '';
-  const page = parseInt((req.query.page as string) || '1');
-  const pageSize = Math.min(parseInt((req.query.pageSize as string) || '50'), 100);
+  const params = req.method === 'POST' ? req.body : req.query;
+
+  const q = (params.q as string) || '';
+  const page = Math.max(1, parseInt((params.page as string) || '1'));
+  const pageSize = Math.min(parseInt((params.pageSize as string) || '50'), 100);
+  const startDate = params.startDate as string | undefined;
+  const endDate = params.endDate as string | undefined;
+
+  const match: Record<string, any> = { userId: uid };
+
+  if (startDate || endDate) {
+    match.date = {};
+    if (startDate) match.date.$gte = startDate;
+    if (endDate) match.date.$lte = endDate;
+  }
 
   if (!q.trim()) {
-    const total = await JournalEntry.countDocuments({ userId: uid });
-    const entries = await JournalEntry.find({ userId: uid })
+    const total = await JournalEntry.countDocuments(match);
+    const entries = await JournalEntry.find(match)
       .sort({ date: -1 })
       .skip((page - 1) * pageSize)
       .limit(pageSize)
@@ -51,24 +65,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }).lean();
   const accountCodes = matchingAccounts.map(a => a.code);
 
-  const matchingLines = await JournalLine.find({
+  const lineMatch: Record<string, any> = {
     userId: uid,
-    $or: [
-      { description: searchRegex },
-      { accountCode: { $in: accountCodes } },
-    ],
-  }).lean();
+    $or: [{ description: searchRegex }, { accountCode: { $in: accountCodes } }],
+  };
 
-  const matchedEntryIds = [...new Set(matchingLines.map(l => l.journalEntryId))];
+  const matchingLines = await JournalLine.find(lineMatch).lean();
+  const matchedEntryIds = [...new Set(matchingLines.map(l => l.journalEntryId.toString()))];
 
-  const total = matchedEntryIds.length;
-  const paginatedEntryIds = matchedEntryIds.slice((page - 1) * pageSize, page * pageSize);
+  const entryMatch: Record<string, any> = { _id: { $in: matchedEntryIds }, userId: uid };
+  if (startDate || endDate) {
+    entryMatch.date = {};
+    if (startDate) entryMatch.date.$gte = startDate;
+    if (endDate) entryMatch.date.$lte = endDate;
+  }
+
+  const total = await JournalEntry.countDocuments(entryMatch);
+  const entries = await JournalEntry.find(entryMatch)
+    .sort({ date: -1 })
+    .skip((page - 1) * pageSize)
+    .limit(pageSize)
+    .lean();
 
   const results = [];
-  for (const eid of paginatedEntryIds) {
-    const entry = await JournalEntry.findOne({ _id: eid, userId: uid }).lean();
-    if (!entry) continue;
-    const lines = await JournalLine.find({ journalEntryId: eid, userId: uid }).lean();
+  for (const entry of entries) {
+    const lines = await JournalLine.find({ journalEntryId: (entry as any)._id.toString(), userId: uid }).lean();
     results.push({ ...entry, lines });
   }
 
