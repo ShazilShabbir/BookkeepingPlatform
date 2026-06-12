@@ -63,6 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ success: true, data: months });
   } catch (e: any) {
-    return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+    console.error('dashboard trends error:', e?.message || e);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

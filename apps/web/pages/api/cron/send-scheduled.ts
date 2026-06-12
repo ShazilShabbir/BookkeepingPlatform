@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { timingSafeEqual } from 'crypto';
 import dbConnect from '@/lib/mongoose';
 import ReportSchedule from '@/lib/models/ReportSchedule';
 import { getFinancialStatements, generateReportHTML } from '@/lib/reports';
@@ -6,11 +7,19 @@ import { generateWorkbook } from '@/lib/excel';
 import User from '@/lib/models/User';
 import Client from '@/lib/models/Client';
 
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!token || !process.env.CRON_SECRET || !safeCompare(token, process.env.CRON_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

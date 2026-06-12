@@ -63,6 +63,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (e: any) {
     console.error('reconcile/confirm error:', e?.message || e);
-    return res.status(500).json({ error: e?.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

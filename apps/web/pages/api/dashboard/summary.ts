@@ -123,6 +123,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (e: any) {
     console.error('dashboard summary error:', e?.message || e);
-    return res.status(500).json({ success: false, error: e?.message || 'Internal server error' });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

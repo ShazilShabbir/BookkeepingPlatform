@@ -182,11 +182,16 @@ export function generateReportHTML(
       </tr>`).join('');
   };
 
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
   const dateLabel = dateRange.start && dateRange.end
     ? `${dateRange.start} – ${dateRange.end}`
     : 'All Time';
 
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+  const safeOwnerName = esc(ownerName);
+  const safeShareLink = shareLink ? esc(shareLink) : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -195,7 +200,7 @@ export function generateReportHTML(
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
     <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px;text-align:center">
       <h1 style="color:#fff;margin:0;font-size:24px">Financial Report</h1>
-      <p style="color:#c7d2fe;margin:8px 0 0;font-size:14px">${ownerName} &middot; ${dateLabel}</p>
+      <p style="color:#c7d2fe;margin:8px 0 0;font-size:14px">${safeOwnerName} &middot; ${dateLabel}</p>
     </td></tr>
 
     <tr><td style="padding:24px">
@@ -301,11 +306,11 @@ export function generateReportHTML(
       </div>
     </td></tr>
 
-    ${shareLink ? `
+    ${safeShareLink ? `
     <tr><td style="padding:0 24px 24px">
       <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:16px;text-align:center">
         <p style="color:#4338ca;font-size:14px;font-weight:600;margin:0 0 8px">View Live Report</p>
-        <a href="${shareLink}" style="color:#6366f1;font-size:13px;word-break:break-all">${shareLink}</a>
+        <a href="${safeShareLink}" style="color:#6366f1;font-size:13px;word-break:break-all">${safeShareLink}</a>
         <p style="color:#64748b;font-size:12px;margin:8px 0 0">Open this link anytime to see your up-to-date financial data.</p>
       </div>
     </td></tr>` : ''}

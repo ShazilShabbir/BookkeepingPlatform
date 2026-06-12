@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Content-Disposition', 'attachment; filename=financial-report.xlsx');
     res.send(buffer);
   } catch (e: any) {
-    console.error('export-excel error:', e?.message || e, e?.stack);
-    res.status(500).json({ error: e?.message || 'Internal server error' });
+    console.error('export-excel error:', e?.message || e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }

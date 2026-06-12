@@ -21,7 +21,13 @@ global.mongooseCache = cached;
 async function dbConnect(): Promise<typeof mongoose> {
   if (cached.conn) return cached.conn;
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI);
+    cached.promise = mongoose.connect(MONGODB_URI, {
+      ssl: true,
+      retryWrites: true,
+      w: 'majority',
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
   }
   cached.conn = await cached.promise;
   return cached.conn;

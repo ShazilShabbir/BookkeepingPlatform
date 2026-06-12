@@ -62,6 +62,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ success: true, data: { matchedCount: rec.matchedCount, unmatchedCount: rec.unmatchedCount } });
   } catch (e: any) {
     console.error('reconcile/match error:', e?.message || e);
-    return res.status(500).json({ error: e?.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

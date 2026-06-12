@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
+import { checkLoginRateLimit } from '@/lib/rateLimit';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -12,8 +13,15 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        const ip = (req?.headers?.['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+          || req?.headers?.['x-real-ip'] as string
+          || 'unknown';
+        const { allowed } = checkLoginRateLimit(ip);
+        if (!allowed) return null;
+
         await dbConnect();
         const user = await User.findOne({ email: credentials.email.toLowerCase() }).lean();
         if (!user) return null;

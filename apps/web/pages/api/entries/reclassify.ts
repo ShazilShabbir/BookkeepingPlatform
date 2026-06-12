@@ -48,7 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ success: true, data: { oldCode, newCode: newAccountCode } });
   } catch (e: any) {
     await session.abortTransaction();
-    return res.status(500).json({ error: e?.message || 'Reclassification failed' });
+    console.error('reclassify error:', e?.message || e);
+    return res.status(500).json({ error: 'Reclassification failed' });
   } finally {
     session.endSession();
   }

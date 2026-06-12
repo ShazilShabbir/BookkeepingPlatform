@@ -101,6 +101,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (e: any) {
     console.error('customers error:', e?.message || e);
     if (e?.code === 11000) return res.status(409).json({ error: 'Email already in use' });
-    return res.status(500).json({ error: e?.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
