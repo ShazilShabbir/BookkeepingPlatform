@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IImportJob extends Document {
+export interface IImportJob extends Omit<Document, 'errors'> {
   userId: string;
   originalFileName: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';

@@ -211,9 +211,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (dedupCache.has(dateVal)) {
             existing = dedupCache.get(dateVal)!;
           } else {
-            const entryDocs = await JournalEntry.find({ userId: uid, date: dateVal }, { description: 1 }).lean();
+            const entryDocs: any[] = await JournalEntry.find({ userId: uid, date: dateVal }, { description: 1 }).lean() as any[];
             const entryIds = entryDocs.map(e => e._id.toString());
-            const lineDocs = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }, { description: 1 }).lean();
+            const lineDocs: any[] = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }, { description: 1 }).lean() as any[];
             const descs = [...entryDocs.map(e => e.description), ...lineDocs.map(l => l.description || '')];
             existing = descs.map(d => d.toLowerCase()).filter(Boolean);
             dedupCache.set(dateVal, existing);

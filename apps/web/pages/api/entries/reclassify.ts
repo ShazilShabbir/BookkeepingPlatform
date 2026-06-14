@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import dbConnect from '@/lib/mongoose';
+import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
+import Account from '@/lib/models/Account';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import mongoose from 'mongoose';
 import { logAction } from '@/lib/audit';
