@@ -34,7 +34,7 @@ async function api(path: string, options?: RequestInit) {
 
 const PAGE_SIZE = 20;
 
-export default function ReclassifyEntries() {
+export default function ReclassifyEntries({ userId }: { userId: string }) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +57,7 @@ export default function ReclassifyEntries() {
       params.set('page', String(pageNum));
       params.set('pageSize', String(PAGE_SIZE));
       if (searchTerm.trim()) params.set('q', searchTerm.trim());
+      if (userId) params.set('userId', userId);
       const json = await api(`/api/entries/search?${params.toString()}`);
       if (json.success) {
         setEntries(prev => append ? [...prev, ...json.data] : json.data);
@@ -73,7 +74,7 @@ export default function ReclassifyEntries() {
 
   const loadAccounts = async () => {
     try {
-      const json = await api('/api/accounts');
+      const json = await api('/api/accounts?userId=' + encodeURIComponent(userId));
       if (json.success) setAccounts(json.data);
     } catch {
       toast.error('Failed to load accounts');
@@ -116,6 +117,7 @@ export default function ReclassifyEntries() {
           entryId: activeReclass.entryId,
           lineId: activeReclass.lineId,
           newAccountCode: pickValue,
+          userId,
         }),
       });
       if (json.success) {

@@ -20,14 +20,14 @@ const resourceLabels: Record<string, string> = {
   schedule: 'Schedule',
 };
 
-export default function TrashPanel() {
+export default function TrashPanel({ userId }: { userId: string }) {
   const [items, setItems] = useState<TrashItemData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadTrash = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/trash');
+      const res = await fetch('/api/trash?userId=' + encodeURIComponent(userId));
       const json = await res.json();
       if (json.success) setItems(json.data);
     } catch {
@@ -41,7 +41,7 @@ export default function TrashPanel() {
 
   const deletePermanently = async (id: string) => {
     try {
-      const res = await fetch(`/api/trash?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/trash?id=${id}&userId=` + encodeURIComponent(userId), { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         toast.success('Deleted permanently');

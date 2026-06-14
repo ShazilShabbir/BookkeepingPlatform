@@ -36,6 +36,27 @@ export const journalEntrySchema = z.object({
   })).min(1),
 });
 
+export const amountModeSchema = z.enum(['single_with_sign', 'revenue_and_cost', 'debit_credit']);
+
+export const csvMappingSchema = z.object({
+  dateColumn: z.string().optional().default(''),
+  amountColumn: z.string().optional().default(''),
+  amountColumn2: z.string().optional().default(''),
+  descriptionColumn: z.string().optional().default(''),
+  categoryColumn: z.string().optional().default(''),
+  amountMode: amountModeSchema.optional().default('revenue_and_cost'),
+});
+
+export const customFieldSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  type: z.enum(['text', 'number', 'date', 'boolean']),
+  required: z.boolean().optional().default(false),
+  csvColumn: z.string().nullable().optional().default(null),
+});
+
+export const customFieldsArraySchema = z.array(customFieldSchema);
+
 export function safeParse<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: string } {
   const result = schema.safeParse(data);
   if (result.success) return { success: true, data: result.data };

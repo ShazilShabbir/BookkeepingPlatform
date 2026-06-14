@@ -1,15 +1,5 @@
 export interface AccountInfo { code: string; name: string; type: string; }
 
-export interface RowMapping {
-  dateColumn: string;
-  amountColumn: string;
-  costColumn: string;
-  descriptionColumn: string;
-  categoryColumn: string;
-  idColumn: string;
-  quantityColumn: string;
-}
-
 export const KEYWORD_RULES: { keywords: string[]; code: string }[] = [
   { keywords: ['revenue', 'income', 'sales', 'received', 'sold', 'subscription'], code: '4000' },
   { keywords: ['service', 'consulting', 'fee', 'hourly', 'retainer'], code: '4100' },

@@ -1,15 +1,18 @@
 /** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV === 'development';
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' https://www.googletagmanager.com https://js.stripe.com",
+  `script-src 'self' 'unsafe-eval'${isDev ? " 'unsafe-inline'" : ''} https://www.googletagmanager.com https://js.stripe.com https://www.google-analytics.com https://www.googletagmanager.com 'sha256-VRkfizwnyQxtND31OAsmNPoFx6XzMKrglq3F12CdZv8='`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https://*.stripe.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://api.openrouter.ai https://api.stripe.com",
+  "connect-src 'self' https://api.openrouter.ai https://api.stripe.com https://www.google-analytics.com https://www.google.com",
   "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  "report-uri /api/csp-report",
 ].join('; ');
 
 const nextConfig = {

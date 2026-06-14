@@ -1,14 +1,17 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
 import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
 import { logAction } from '@/lib/audit';
+import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
+import { csvMappingSchema, customFieldsArraySchema, safeParse } from '@/lib/validate';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    if (!checkCsrf(req, res)) return;
+
+    const token = await requireAuth(req, res);
+    if (!token) return;
     const uid = token.sub!;
 
     await dbConnect();
@@ -26,6 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             uid: (user as any)._id.toString(),
             email: (user as any).email || '',
             name: (user as any).name || '',
+            csvMapping: (user as any).csvMapping || {},
+            customFields: (user as any).customFields || [],
+            csvProfiles: (user as any).csvProfiles || [],
             createdAt: (user as any).createdAt?.toISOString() || '',
           },
         });
@@ -42,6 +48,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
+      if (!requireRole(token, 'admin')) {
+        return res.status(403).json({ error: 'Only admins can create customers' });
+      }
       const { name, email } = req.body;
       if (!name || !email) return res.status(400).json({ error: 'name and email are required' });
 
@@ -67,7 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
-      const { customerUid, csvMapping, customFields } = req.body;
+      if (!requireRole(token, 'admin')) {
+        return res.status(403).json({ error: 'Only admins can update customers' });
+      }
+      const { customerUid, csvMapping, customFields, csvProfiles } = req.body;
       if (!customerUid) return res.status(400).json({ error: 'customerUid is required' });
 
       const customer = await User.findById(customerUid);
@@ -76,14 +88,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const update: Record<string, any> = { updatedAt: new Date() };
-      if (csvMapping !== undefined) update.csvMapping = csvMapping;
-      if (customFields !== undefined) update.customFields = customFields;
+      if (csvMapping !== undefined) {
+        const parsed = safeParse(csvMappingSchema, csvMapping);
+        if (!parsed.success) return res.status(400).json({ error: `csvMapping: ${parsed.error}` });
+        update.csvMapping = parsed.data;
+      }
+      if (customFields !== undefined) {
+        const parsed = safeParse(customFieldsArraySchema, customFields);
+        if (!parsed.success) return res.status(400).json({ error: `customFields: ${parsed.error}` });
+        update.customFields = parsed.data;
+      }
+      if (csvProfiles !== undefined) update.csvProfiles = csvProfiles;
       await User.findByIdAndUpdate(customerUid, { $set: update });
 
       return res.status(200).json({ success: true });
     }
 
     if (req.method === 'DELETE') {
+      if (!requireRole(token, 'admin')) {
+        return res.status(403).json({ error: 'Only admins can delete customers' });
+      }
       const { customerUid } = req.body;
       if (!customerUid) return res.status(400).json({ error: 'customerUid is required' });
 

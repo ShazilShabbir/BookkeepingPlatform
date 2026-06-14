@@ -18,7 +18,7 @@ async function api(path: string, options?: RequestInit) {
   return res.json();
 }
 
-export default function ClientManager() {
+export default function ClientManager({ userId }: { userId: string }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -30,7 +30,7 @@ export default function ClientManager() {
   const loadClients = async () => {
     setLoading(true);
     try {
-      const json = await api('/api/clients');
+      const json = await api('/api/clients?userId=' + encodeURIComponent(userId));
       if (json.success) setClients(json.data);
     } catch {
       toast.error('Failed to load clients');
@@ -50,7 +50,7 @@ export default function ClientManager() {
     try {
       const json = await api('/api/clients', {
         method: 'POST',
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ userId, name: name.trim() }),
       });
       if (json.success) {
         toast.success('Client created');
@@ -68,7 +68,7 @@ export default function ClientManager() {
 
   const deleteClient = async (client: Client) => {
     try {
-      const json = await api(`/api/clients?id=${client._id}`, { method: 'DELETE' });
+      const json = await api(`/api/clients?id=${client._id}&userId=` + encodeURIComponent(userId), { method: 'DELETE' });
       if (json.success) {
         toast.success('Client removed');
         loadClients();

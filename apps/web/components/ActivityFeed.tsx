@@ -29,14 +29,14 @@ const resourceIcons: Record<string, string> = {
   trash: '🗑️',
 };
 
-export default function ActivityFeed() {
+export default function ActivityFeed({ userId }: { userId: string }) {
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const res = await fetch('/api/dashboard/activity');
+        const res = await fetch('/api/dashboard/activity?userId=' + encodeURIComponent(userId));
         const json = await res.json();
         if (json.success) setItems(json.data);
       } catch {} finally {

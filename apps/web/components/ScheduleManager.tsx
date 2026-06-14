@@ -26,7 +26,7 @@ async function api(path: string, options?: RequestInit) {
   return res.json();
 }
 
-export default function ScheduleManager() {
+export default function ScheduleManager({ userId }: { userId: string }) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,8 +38,8 @@ export default function ScheduleManager() {
     setLoading(true);
     try {
       const [schedRes, clientRes] = await Promise.all([
-        api('/api/schedules'),
-        api('/api/clients'),
+        api('/api/schedules?userId=' + encodeURIComponent(userId)),
+        api('/api/clients?userId=' + encodeURIComponent(userId)),
       ]);
       if (schedRes.success) setSchedules(schedRes.data);
       if (clientRes.success) setClients(clientRes.data);
@@ -61,7 +61,7 @@ export default function ScheduleManager() {
     try {
       const json = await api('/api/schedules', {
         method: 'POST',
-        body: JSON.stringify({ clientId, frequency, reportType: 'financial' }),
+        body: JSON.stringify({ userId, clientId, frequency, reportType: 'financial' }),
       });
       if (json.success) {
         toast.success('Schedule created');
@@ -79,7 +79,7 @@ export default function ScheduleManager() {
 
   const deleteSchedule = async (id: string) => {
     try {
-      const json = await api(`/api/schedules?id=${id}`, { method: 'DELETE' });
+      const json = await api(`/api/schedules?id=${id}&userId=` + encodeURIComponent(userId), { method: 'DELETE' });
       if (json.success) {
         toast.success('Schedule removed');
         loadSchedules();

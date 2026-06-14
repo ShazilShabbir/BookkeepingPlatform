@@ -178,14 +178,29 @@ export interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
-export interface ColumnMapping {
+export type AmountMode = 'single_with_sign' | 'revenue_and_cost' | 'debit_credit';
+
+export interface CsvMapping {
   dateColumn: string;
   amountColumn: string;
-  costColumn: string;
-  descriptionColumn: string;
-  categoryColumn: string;
-  idColumn: string;
-  quantityColumn: string;
+  amountColumn2?: string;
+  descriptionColumn?: string;
+  categoryColumn?: string;
+  amountMode?: AmountMode;
+}
+
+export interface CustomField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'boolean';
+  required?: boolean;
+  csvColumn: string | null;
+}
+
+export interface CsvProfile {
+  name: string;
+  csvMapping: CsvMapping;
+  customFields: CustomField[];
 }
 
 export interface ImportJob {
@@ -199,7 +214,10 @@ export interface ImportJob {
   importedEntries: number;
   skippedRows: number;
   errors: { row: number; reason: string }[];
-  mapping: ColumnMapping;
+  mapping: Record<string, string>;
+  csvMapping?: CsvMapping;
+  customFields?: CustomField[];
+  customFieldMapping?: Record<string, string>;
   duplicatesSkipped?: number;
   duplicateRows?: { row: number; description: string; date: string; matchedDescription: string }[];
   excludedRows?: number[];

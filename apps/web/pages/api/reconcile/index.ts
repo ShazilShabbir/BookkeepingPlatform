@@ -3,11 +3,12 @@ import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Reconciliation from '@/lib/models/Reconciliation';
 import ReconciliationLine from '@/lib/models/ReconciliationLine';
+import { resolveUserIdFromQuery } from '@/lib/customerContext';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const uid = token.sub!;
+  const uid = await resolveUserIdFromQuery(token, req);
 
   await dbConnect();
 

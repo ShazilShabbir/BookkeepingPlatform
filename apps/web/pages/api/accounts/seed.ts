@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Account from '@/lib/models/Account';
+import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
 
 const defaultAccounts = [
   { code: '1000', name: 'Cash', type: 'asset', normalBalance: 'debit' },
@@ -32,25 +32,39 @@ const defaultAccounts = [
 ];
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (!checkCsrf(req, res)) return;
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const uid = token.sub!;
+    const token = await requireAuth(req, res);
+    if (!token) return;
+    if (!requireRole(token, 'admin')) {
+      return res.status(403).json({ error: 'Only admins can seed accounts' });
+    }
+    const uid = token.sub!;
 
-  await dbConnect();
+    await dbConnect();
 
-  const existing = await Account.countDocuments({ userId: uid });
-  if (existing > 0) return res.status(409).json({ error: 'Accounts already seeded' });
+    const existing = await Account.countDocuments({ userId: uid });
+    if (existing > 0) return res.status(409).json({ error: 'Accounts already seeded' });
 
-  const accounts = defaultAccounts.map(a => ({
-    ...a,
-    userId: uid,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }));
+    const accounts = defaultAccounts.map(a => ({
+      ...a,
+      userId: uid,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
 
-  await Account.insertMany(accounts);
-  return res.status(201).json({ success: true, data: { count: accounts.length } });
+    await Account.insertMany(accounts);
+    return res.status(201).json({ success: true, data: { count: accounts.length } });
+  } catch (e: any) {
+    console.error('[accounts/seed] error:', {
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+    });
+    const isDev = process.env.NODE_ENV === 'development';
+    return res.status(500).json({ error: isDev ? (e?.message || 'Seed failed') : 'Seed failed' });
+  }
 }

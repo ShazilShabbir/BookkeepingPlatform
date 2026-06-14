@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongoose';
 import ImportJob from '@/lib/models/ImportJob';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import path from 'path';
+import { resolveUserId } from '@/lib/customerContext';
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
 
@@ -21,12 +22,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const uid = token.sub!;
+  const uid = await resolveUserId(token, req.body.userId);
 
   await dbConnect();
 
   try {
-    const { fileName, content, mapping, aiMappings, dedupEnabled } = req.body;
+    const { fileName, content, mapping, csvMapping, csvProfileName, customFieldMapping, aiMappings, dedupEnabled } = req.body;
     if (!fileName || !content) return res.status(400).json({ error: 'fileName and content are required' });
 
     if (!isAllowedFileType(fileName)) {
@@ -52,6 +53,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalRows: 0,
       processedRows: 0,
       mapping: mapping || {},
+      csvMapping: csvMapping || null,
+      csvProfileName: csvProfileName || null,
+      customFieldMapping: customFieldMapping || null,
       aiMappings: aiMappings || {},
       dedupEnabled: dedupEnabled !== false,
     });

@@ -21,7 +21,7 @@ interface AccountOption { code: string; name: string; }
 
 function fmt(n: number) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
 
-export default function Reconcile({ userId: _userId }: { userId: string }) {
+export default function Reconcile({ userId }: { userId: string }) {
   const [step, setStep] = useState<Step>('setup');
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
@@ -41,7 +41,7 @@ export default function Reconcile({ userId: _userId }: { userId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('/api/accounts')
+    fetch('/api/accounts?userId=' + encodeURIComponent(userId))
       .then(r => r.json())
       .then(json => { if (json.success) setAccounts(json.data || []); })
       .catch(() => {});
@@ -50,7 +50,7 @@ export default function Reconcile({ userId: _userId }: { userId: string }) {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch('/api/reconcile');
+      const res = await fetch(`/api/reconcile?userId=${encodeURIComponent(userId)}`);
       const json = await res.json();
       if (json.success) setHistory(json.data || []);
     } catch {}
@@ -161,7 +161,7 @@ export default function Reconcile({ userId: _userId }: { userId: string }) {
     if (!query.trim()) { setSearchResults([]); return; }
     setSearching(true);
     try {
-      const res = await fetch(`/api/entries/search?q=${encodeURIComponent(query)}&accountCode=${accountCode}`);
+      const res = await fetch(`/api/entries/search?q=${encodeURIComponent(query)}&accountCode=${accountCode}&userId=${encodeURIComponent(userId)}`);
       const json = await res.json();
       if (json.success) setSearchResults(json.data || []);
     } catch {}
@@ -194,7 +194,7 @@ export default function Reconcile({ userId: _userId }: { userId: string }) {
 
   const loadHistoryDetail = async (id: string) => {
     try {
-      const res = await fetch(`/api/reconcile?id=${id}`);
+      const res = await fetch(`/api/reconcile?id=${id}&userId=${encodeURIComponent(userId)}`);
       const json = await res.json();
       if (json.success) {
         setReconciliationId(id);

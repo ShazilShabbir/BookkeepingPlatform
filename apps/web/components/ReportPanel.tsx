@@ -15,8 +15,8 @@ interface DashboardData {
   kpis: { totalRevenue: number; totalExpenses: number; netProfit: number; profitMargin: number; entryCount: number };
   profitLoss: { sections: StatementSection[]; netIncome: number; netIncomeRatio: number };
   balanceSheet: { sections: StatementSection[]; totalAssets: number; totalLiabilities: number; totalEquity: number };
-  cashFlow: { sections: CashFlowSection[]; totalChange: number };
-  trialBalance: { rows: TrialBalanceRow[]; totals: { totalDebits: number; totalCredits: number; difference: number; balanced: boolean } };
+  cashFlow: { sections: CashFlowSection[]; totalChange: number } | null;
+  trialBalance: { rows: TrialBalanceRow[]; totals: { totalDebits: number; totalCredits: number; difference: number; balanced: boolean } } | null;
   dateRange: { startDate: string | null; endDate: string | null };
 }
 
@@ -32,12 +32,14 @@ const tabs: { id: ReportView; label: string }[] = [
   { id: 'tb', label: 'Trial Balance' },
 ];
 
-export default function ReportPanel() {
+export default function ReportPanel({ userId }: { userId: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [view, setView] = useState<ReportView>('all');
+  const availableViews = new Set(data ? ['all', 'pl', 'bs', ...(data.cashFlow ? ['cf'] : []), ...(data.trialBalance ? ['tb'] : [])] : ['all', 'pl', 'bs']);
+  const safeView = availableViews.has(view) ? view : 'all';
   const [downloading, setDownloading] = useState(false);
   const fetchedRef = useRef(false);
 
@@ -47,6 +49,7 @@ export default function ReportPanel() {
       const params = new URLSearchParams();
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
+      if (userId) params.set('userId', userId);
       const res = await fetch(`/api/dashboard/summary?${params.toString()}`);
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load');
@@ -56,7 +59,7 @@ export default function ReportPanel() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, userId]);
 
   useEffect(() => {
     if (!fetchedRef.current) { fetchedRef.current = true; fetchData(); }
@@ -68,7 +71,7 @@ export default function ReportPanel() {
       const res = await fetch('/api/reports/export-excel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate }),
+        body: JSON.stringify({ startDate, endDate, userId }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -191,6 +194,9 @@ export default function ReportPanel() {
   const renderCF = () => {
     if (!data) return null;
     const { cashFlow } = data;
+    if (!cashFlow) {
+      return <p className="text-sm text-surface-400 text-center py-8">Cash Flow requires <a href="/pricing" className="text-primary-600 underline">Pro plan or higher</a>.</p>;
+    }
     if (cashFlow.sections.every(s => s.items.length === 0)) {
       return <p className="text-sm text-surface-400 text-center py-8">No cash flow data available</p>;
     }
@@ -232,6 +238,9 @@ export default function ReportPanel() {
   const renderTB = () => {
     if (!data) return null;
     const { trialBalance } = data;
+    if (!trialBalance) {
+      return <p className="text-sm text-surface-400 text-center py-8">Trial Balance requires <a href="/pricing" className="text-primary-600 underline">Pro plan or higher</a>.</p>;
+    }
     if (trialBalance.rows.length === 0) {
       return <p className="text-sm text-surface-400 text-center py-8">No trial balance data available</p>;
     }
@@ -282,7 +291,7 @@ export default function ReportPanel() {
 
   const renderContent = () => {
     if (!data) return null;
-    switch (view) {
+    switch (safeView) {
       case 'pl': return renderPL();
       case 'bs': return renderBS();
       case 'cf': return renderCF();
@@ -291,8 +300,8 @@ export default function ReportPanel() {
         <div className="space-y-8">
           <div><h3 className="text-base font-semibold text-surface-900 mb-4">Profit & Loss</h3>{renderPL()}</div>
           <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Balance Sheet</h3>{renderBS()}</div>
-          <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Cash Flow</h3>{renderCF()}</div>
-          <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Trial Balance</h3>{renderTB()}</div>
+          {data.cashFlow && <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Cash Flow</h3>{renderCF()}</div>}
+          {data.trialBalance && <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Trial Balance</h3>{renderTB()}</div>}
         </div>
       );
     }
@@ -322,12 +331,12 @@ export default function ReportPanel() {
         </div>
 
         <div className="flex gap-1 border-b border-surface-200 mb-6">
-          {tabs.map(t => (
+          {tabs.filter(t => t.id === 'all' || t.id === 'pl' || t.id === 'bs' || (t.id === 'cf' && data?.cashFlow) || (t.id === 'tb' && data?.trialBalance)).map(t => (
             <button
               key={t.id}
               onClick={() => setView(t.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                view === t.id
+                safeView === t.id
                   ? 'border-primary-600 text-primary-700'
                   : 'border-transparent text-surface-500 hover:text-surface-700'
               }`}

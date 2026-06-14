@@ -29,10 +29,12 @@ async function api(path: string, options?: RequestInit) {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
+  return json;
 }
 
-export default function ChartOfAccounts() {
+export default function ChartOfAccounts({ userId }: { userId: string }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -51,7 +53,7 @@ export default function ChartOfAccounts() {
   const loadAccounts = async () => {
     setLoading(true);
     try {
-      const json = await api('/api/accounts');
+      const json = await api('/api/accounts?userId=' + encodeURIComponent(userId));
       if (json.success) setAccounts(json.data);
       else toast.error(json.error || 'Failed to load accounts');
     } catch {
@@ -137,21 +139,36 @@ export default function ChartOfAccounts() {
       const lines = text.split('\n').filter(l => l.trim());
       if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
       const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
-      const results = { created: 0, errors: 0 };
+      if (!header.includes('code') || !header.includes('name') || !header.includes('type')) {
+        toast.error('CSV must have columns: code, name, type');
+        return;
+      }
+      const results = { created: 0, skipped: 0, errors: 0 };
+      let lastError = '';
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
         const row = Object.fromEntries(header.map((h, idx) => [h, cols[idx] || '']));
         try {
           const body: Record<string, any> = { code: row.code, name: row.name, type: row.type, normalBalance: row.normalbalance || 'debit' };
           if (row.parentcode) body.parentCode = row.parentcode;
-          const json = await api('/api/accounts', { method: 'POST', body: JSON.stringify(body) });
-          if (json.success) results.created++;
-          else results.errors++;
-        } catch {
-          results.errors++;
+          await api('/api/accounts', { method: 'POST', body: JSON.stringify(body) });
+          results.created++;
+        } catch (err: any) {
+          if (err.message === 'Account code already exists') {
+            results.skipped++;
+          } else {
+            results.errors++;
+            lastError = err.message || 'Unknown error';
+          }
         }
       }
-      toast.success(`Import complete: ${results.created} created, ${results.errors} errors`);
+      if (lastError) {
+        toast.error(`Row error (example): ${lastError}`);
+      }
+      const parts = [`Created ${results.created}`];
+      if (results.skipped > 0) parts.push(`${results.skipped} skipped (duplicates)`);
+      if (results.errors > 0) parts.push(`${results.errors} failed`);
+      toast.success(`Import complete: ${parts.join(', ')}`);
       loadAccounts();
     } catch {
       toast.error('Failed to parse CSV');
@@ -249,12 +266,21 @@ export default function ChartOfAccounts() {
               </svg>
               Export CSV
             </Button>
-            <Button onClick={() => fileRef.current?.click()} loading={importing} variant="secondary">
-              <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-              </svg>
-              Import CSV
-            </Button>
+            <div className="relative group">
+              <Button onClick={() => fileRef.current?.click()} loading={importing} variant="secondary">
+                <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+                Import CSV
+              </Button>
+              <div className="absolute top-full mt-1.5 right-0 z-10 hidden group-hover:block w-64 p-3 bg-white rounded-lg shadow-lg border border-surface-200 text-xs text-surface-600">
+                <p className="font-medium text-surface-800 mb-1">CSV format:</p>
+                <code className="block text-[11px] bg-surface-50 p-1.5 rounded border border-surface-200 break-all">
+                  code,name,type,normalbalance,parentcode
+                </code>
+                <p className="mt-1">Download Export CSV as a template.</p>
+              </div>
+            </div>
             <input ref={fileRef} type="file" accept=".csv" onChange={handleImport} className="hidden" />
             <Button onClick={() => { resetForm(); setShowForm(true); }}>
               <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

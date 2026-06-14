@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import type { CsvMapping, CustomField } from '@/lib/types';
 
 export interface IUser extends Document {
   email: string;
@@ -9,6 +10,7 @@ export interface IUser extends Document {
   createdBy: string;
   csvMapping: Record<string, string>;
   customFields: Record<string, string>;
+  csvProfiles?: { name: string; csvMapping: CsvMapping; customFields: CustomField[] }[];
   stripeCustomerId: string;
   subscriptionTier: string;
   subscriptionStatus: string;
@@ -27,6 +29,7 @@ const UserSchema = new Schema<IUser>({
   createdBy: { type: String, default: '' },
   csvMapping: { type: Schema.Types.Mixed, default: {} },
   customFields: { type: Schema.Types.Mixed, default: {} },
+  csvProfiles: { type: [Schema.Types.Mixed], default: undefined },
   stripeCustomerId: { type: String, default: '' },
   subscriptionTier: { type: String, default: 'free', enum: ['free', 'pro', 'business'] },
   subscriptionStatus: { type: String, default: 'free', enum: ['free', 'active', 'past_due', 'canceled', 'trialing'] },

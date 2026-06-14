@@ -8,6 +8,9 @@ export interface IImportJob extends Document {
   processedRows: number;
   filePath?: string;
   mapping?: Record<string, string>;
+  csvMapping?: Record<string, any>;
+  csvProfileName?: string;
+  customFieldMapping?: Record<string, string>;
   aiMappings?: Record<string, any>;
   dedupEnabled?: boolean;
   excludedRows?: number[];
@@ -30,6 +33,9 @@ const ImportJobSchema = new Schema<IImportJob>({
   processedRows: { type: Number, default: 0 },
   filePath: { type: String, default: null },
   mapping: { type: Schema.Types.Mixed, default: null },
+  csvMapping: { type: Schema.Types.Mixed, default: null },
+  csvProfileName: { type: String, default: null },
+  customFieldMapping: { type: Schema.Types.Mixed, default: null },
   aiMappings: { type: Schema.Types.Mixed, default: null },
   dedupEnabled: { type: Boolean, default: true },
   excludedRows: { type: [Number], default: [] },

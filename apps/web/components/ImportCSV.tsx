@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
-import type { ImportJob } from '@/lib/types';
+import type { CsvMapping, CustomField, ImportJob } from '@/lib/types';
 
 interface ColumnAnalysis {
   name: string;
@@ -55,13 +55,14 @@ const FALLBACK_ACCOUNTS: AccountOption[] = [
   { code: '5900', name: 'Uncategorized Expense' },
 ];
 
-export default function ImportCSV({ userId }: ImportCSVProps) {
+export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
   const [step, setStep] = useState<Step>('idle');
   const [progress, setProgress] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState('');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [customFieldMapping, setCustomFieldMapping] = useState<Record<string, string>>({});
   const [acceptedIssues, setAcceptedIssues] = useState<Set<string>>(new Set());
   const [job, setJob] = useState<ImportJob | null>(null);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
@@ -79,6 +80,12 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
   const [dedupEnabled, setDedupEnabled] = useState(true);
   const [previewPage, setPreviewPage] = useState(0);
 
+  const [savedConfig, setSavedConfig] = useState<{ csvMapping?: CsvMapping; customFields?: CustomField[] } | null>(null);
+  const savedConfigRef = useRef(savedConfig);
+  savedConfigRef.current = savedConfig;
+  const [profiles, setProfiles] = useState<{ name: string; csvMapping: CsvMapping; customFields: CustomField[] }[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState('');
+
   const [accountsList, setAccountsList] = useState<AccountOption[]>([]);
   const [generatedAccounts, setGeneratedAccounts] = useState<AccountOption[]>([]);
   const [aiMappings, setAiMappings] = useState<Record<string, string>>({});
@@ -92,7 +99,7 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
     const poll = async () => {
       if (!pollingActive.current) return;
       try {
-        const res = await fetch(`/api/import-jobs/${processingJobId}`);
+        const res = await fetch(`/api/import-jobs/${processingJobId}?userId=${encodeURIComponent(userId)}`);
         const json = await res.json();
         if (json.success) {
           const data = (json.data?.job || json.data) as ImportJob;
@@ -112,13 +119,54 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const res = await fetch('/api/accounts');
+        const res = await fetch('/api/accounts?userId=' + encodeURIComponent(userId));
         const json = await res.json();
         if (json.success) setAccountsList(json.data || []);
       } catch {}
     };
     loadAccounts();
-  }, []);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!customerUid) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/customers?uid=${encodeURIComponent(customerUid)}`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          const loadedProfiles = json.data.csvProfiles || [];
+          setProfiles(loadedProfiles);
+          if (loadedProfiles.length > 0 && !selectedProfile) {
+            setSelectedProfile(loadedProfiles[0].name);
+            setSavedConfig({ csvMapping: loadedProfiles[0].csvMapping, customFields: loadedProfiles[0].customFields });
+          } else {
+            setSavedConfig({ csvMapping: json.data.csvMapping, customFields: json.data.customFields });
+          }
+          const initial: Record<string, string> = {};
+          const cf = selectedProfile
+            ? (loadedProfiles.find((p: any) => p.name === selectedProfile)?.customFields || [])
+            : (json.data.customFields || []);
+          for (const f of cf) {
+            if (f.csvColumn) initial[f.id] = f.csvColumn;
+          }
+          setCustomFieldMapping(initial);
+        }
+      } catch {}
+    })();
+  }, [customerUid, selectedProfile]);
+
+  const changeProfile = (name: string) => {
+    setSelectedProfile(name);
+    const p = profiles.find(x => x.name === name);
+    if (p) {
+      setSavedConfig({ csvMapping: p.csvMapping, customFields: p.customFields });
+      const initial: Record<string, string> = {};
+      for (const f of p.customFields || []) {
+        if (f.csvColumn) initial[f.id] = f.csvColumn;
+      }
+      setCustomFieldMapping(initial);
+    }
+  };
 
   const reset = useCallback(() => {
     setStep('idle');
@@ -145,12 +193,12 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const res = await fetch('/api/import-jobs');
+      const res = await fetch('/api/import-jobs?userId=' + encodeURIComponent(userId));
       const json = await res.json();
       if (json.success) setHistory(json.data);
     } catch {}
     finally { setHistoryLoading(false); }
-  }, []);
+  }, [userId]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
@@ -158,7 +206,7 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
     if (!window.confirm('Delete this import and all its entries? This cannot be undone.')) return;
     setDeletingId(jobId);
     try {
-      const res = await fetch(`/api/import-jobs/${jobId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/import-jobs/${jobId}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         setHistory(prev => prev.filter(j => j._id !== jobId));
@@ -294,9 +342,29 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
     const result = analyzeCSV(rows);
     if (abortRef.current) return;
     setAnalysis(result);
-    setMapping(result.mapping || {});
+    const autoMapping = result.mapping || {};
 
-    const descCol = result.mapping.descriptionColumn || Object.keys(rows[0]).find(k => /descript|memo|note|item/i.test(k)) || '';
+    if (savedConfigRef.current?.csvMapping) {
+      const csvHeaders = Object.keys(rows[0] || {});
+      const cm = savedConfigRef.current.csvMapping;
+      const overrides: Record<string, string> = {};
+      const keyMap: [keyof CsvMapping, string][] = [
+        ['dateColumn', 'dateColumn'],
+        ['amountColumn', 'amountColumn'],
+        ['amountColumn2', 'costColumn'],
+        ['descriptionColumn', 'descriptionColumn'],
+        ['categoryColumn', 'categoryColumn'],
+      ];
+      for (const [src, dest] of keyMap) {
+        const val = cm[src];
+        if (val && csvHeaders.includes(val)) overrides[dest] = val;
+      }
+      setMapping({ ...autoMapping, ...overrides });
+    } else {
+      setMapping(autoMapping);
+    }
+
+    const descCol = autoMapping.descriptionColumn || Object.keys(rows[0]).find(k => /descript|memo|note|item/i.test(k)) || '';
     let classified = 0;
     for (let i = 0; i < Math.min(rows.length, 2000); i++) {
       const desc = (rows[i][descCol] || '').trim();
@@ -375,9 +443,13 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
           fileName: file.name,
           content: fileContent,
           mapping,
+          csvMapping: savedConfigRef.current?.csvMapping || null,
+          csvProfileName: profiles.length > 1 ? selectedProfile : null,
+          customFieldMapping: Object.keys(customFieldMapping).length > 0 ? customFieldMapping : null,
           excludedRows: Array.from(excludedRows),
           dedupEnabled,
           aiMappings,
+          userId,
         }),
       });
       const uploadData = await uploadRes.json();
@@ -391,7 +463,7 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
       const processRes = await fetch('/api/process-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId }),
+        body: JSON.stringify({ jobId, userId }),
       });
       const processData = await processRes.json();
       if (!processData.success) toast.error(processData.error || 'Processing failed');
@@ -586,6 +658,21 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
           </div>
         </div>
 
+        {profiles.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-surface-500">Profile:</span>
+            <select
+              value={selectedProfile}
+              onChange={e => changeProfile(e.target.value)}
+              className="text-xs border border-surface-200 rounded-lg px-2 py-1.5 bg-white text-surface-700"
+            >
+              {profiles.map(p => (
+                <option key={p.name} value={p.name}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {issues.length > 0 && (
           <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
             <div className="flex items-center justify-between mb-3">
@@ -771,6 +858,69 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
             </table>
           </div>
         </div>
+
+        {savedConfigRef.current?.customFields && savedConfigRef.current.customFields.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-surface-700 mb-3">Custom Field Mapping</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-200">
+                    <th className="text-left py-2 pr-4 font-medium text-surface-600">Custom Field</th>
+                    <th className="text-left py-2 pr-4 font-medium text-surface-600">CSV Column</th>
+                    <th className="text-left py-2 font-medium text-surface-600">Sample Values</th>
+                  </tr>
+                </thead>
+                <tbody className="text-surface-700">
+                  {savedConfigRef.current.customFields.filter(f => f.label).map((field) => {
+                    const csvCol = customFieldMapping[field.id];
+                    const sampleVals = csvCol && analysis?.sampleRows
+                      ? [...new Set(analysis.sampleRows.map(r => r[csvCol]).filter(Boolean))].slice(0, 3)
+                      : [];
+                    return (
+                      <tr key={field.id} className="border-b border-surface-100">
+                        <td className="py-2 pr-4 font-medium">
+                          {field.label}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {csvCol ? (
+                            <span className="text-primary-600 font-medium">{csvCol}</span>
+                          ) : (
+                            <span className="text-surface-400 italic">Not mapped</span>
+                          )}
+                        </td>
+                        <td className="py-2">
+                          <div className="text-xs text-surface-400 flex gap-1.5 flex-wrap">
+                            {sampleVals.length > 0 ? sampleVals.map((v, i) => (
+                              <span key={i} className="bg-surface-100 px-1.5 py-0.5 rounded truncate max-w-[120px]">{v}</span>
+                            )) : csvCol ? (
+                              <span className="italic">no sample data</span>
+                            ) : (
+                              <span className="italic">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2">
+                          <select
+                            value={csvCol || ''}
+                            onChange={(e) => setCustomFieldMapping({ ...customFieldMapping, [field.id]: e.target.value })}
+                            className="text-xs border border-surface-200 rounded px-2 py-1 bg-white"
+                          >
+                            <option value="">—</option>
+                            {columns.map(c => (
+                              <option key={c.name} value={c.name}>{c.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -941,4 +1091,5 @@ export default function ImportCSV({ userId }: ImportCSVProps) {
 
 interface ImportCSVProps {
   userId: string;
+  customerUid?: string;
 }

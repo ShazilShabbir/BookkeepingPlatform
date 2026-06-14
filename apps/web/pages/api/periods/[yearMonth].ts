@@ -1,13 +1,24 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import { logAction } from '@/lib/audit';
+import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  if (!checkCsrf(req, res)) return;
+
+  const token = await requireAuth(req, res);
+  if (!token) return;
+  if (!requireRole(token, 'admin')) {
+    return res.status(403).json({ error: 'Only admins can manage periods' });
+  }
   const uid = token.sub!;
+
+  if (req.method === 'POST' || req.method === 'DELETE') {
+    const { allowed } = await checkFeatureAccess(uid!, 'period-close');
+    if (!allowed) return res.status(403).json({ error: 'Period closing requires Pro plan or higher. Visit /pricing to upgrade.', code: 'UPGRADE_REQUIRED' });
+  }
 
   await dbConnect();
 

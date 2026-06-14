@@ -7,6 +7,7 @@ export interface IJournalEntry extends Document {
   jobId: string;
   reconciled: boolean;
   reconciledAt: string;
+  customFieldValues?: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +19,7 @@ const JournalEntrySchema = new Schema<IJournalEntry>({
   jobId: { type: String, default: null },
   reconciled: { type: Boolean, default: false },
   reconciledAt: { type: String, default: null },
+  customFieldValues: { type: Schema.Types.Mixed, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

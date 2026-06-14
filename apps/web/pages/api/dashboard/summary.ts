@@ -4,13 +4,20 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import { checkFeatureAccess } from '@/lib/subscription';
+import { resolveUserIdFromQuery } from '@/lib/customerContext';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const uid = token.sub!;
+  const uid = await resolveUserIdFromQuery(token, req);
+
+  const [cfAccess, tbAccess] = await Promise.all([
+    checkFeatureAccess(uid!, 'cash-flow'),
+    checkFeatureAccess(uid!, 'trial-balance'),
+  ]);
 
   await dbConnect();
 
@@ -110,14 +117,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     tbRows.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
 
+    const cashFlow = cfAccess.allowed
+      ? { sections: [{ title: 'Operating Activities', items: operating, total: Math.round(totOp * 100) / 100 }, { title: 'Investing Activities', items: investing, total: Math.round(totInv * 100) / 100 }, { title: 'Financing Activities', items: financing, total: Math.round(totFin * 100) / 100 }], totalChange: Math.round((totOp + totInv + totFin) * 100) / 100 }
+      : null;
+
+    const trialBalance = tbAccess.allowed
+      ? { rows: tbRows, totals: { totalDebits: Math.round(totalDebits * 100) / 100, totalCredits: Math.round(totalCredits * 100) / 100, difference: Math.round(Math.abs(totalDebits - totalCredits) * 100) / 100, balanced: Math.abs(totalDebits - totalCredits) < 0.01 } }
+      : null;
+
     return res.status(200).json({
       success: true,
       data: {
         kpis,
         profitLoss: { sections: plSections, netIncome, netIncomeRatio: kpis.profitMargin },
         balanceSheet: { sections: bsSections, totalAssets: bsSections.find(s => s.type === 'asset')?.total || 0, totalLiabilities: bsSections.find(s => s.type === 'liability')?.total || 0, totalEquity: bsSections.find(s => s.type === 'equity')?.total || 0 },
-        cashFlow: { sections: [{ title: 'Operating Activities', items: operating, total: Math.round(totOp * 100) / 100 }, { title: 'Investing Activities', items: investing, total: Math.round(totInv * 100) / 100 }, { title: 'Financing Activities', items: financing, total: Math.round(totFin * 100) / 100 }], totalChange: Math.round((totOp + totInv + totFin) * 100) / 100 },
-        trialBalance: { rows: tbRows, totals: { totalDebits: Math.round(totalDebits * 100) / 100, totalCredits: Math.round(totalCredits * 100) / 100, difference: Math.round(Math.abs(totalDebits - totalCredits) * 100) / 100, balanced: Math.abs(totalDebits - totalCredits) < 0.01 } },
+        cashFlow,
+        trialBalance,
         dateRange: { startDate: startDate || null, endDate: endDate || null },
       },
     });

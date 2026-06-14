@@ -31,8 +31,8 @@ const tiers = [
   {
     id: 'pro',
     label: 'Pro',
-    priceMonthly: 19,
-    priceYearly: 199,
+    priceMonthly: 10,
+    priceYearly: 100,
     description: 'For growing businesses that need full financial insights.',
     popular: true,
     features: [
@@ -50,8 +50,8 @@ const tiers = [
   {
     id: 'business',
     label: 'Business',
-    priceMonthly: 49,
-    priceYearly: 499,
+    priceMonthly: 25,
+    priceYearly: 250,
     description: 'For teams with advanced needs and priority support.',
     popular: false,
     features: [
@@ -114,7 +114,7 @@ export default function PricingPage() {
           <p className="mt-4 text-lg text-surface-500">Choose the plan that fits your business. Upgrade or downgrade anytime.</p>
           <div className="mt-8 inline-flex items-center bg-white border border-surface-200 rounded-xl p-1 shadow-sm">
             <button onClick={() => setInterval('month')} className={clsx('px-5 py-2.5 text-sm font-medium rounded-lg transition-colors', interval === 'month' ? 'bg-surface-900 text-white shadow-sm' : 'text-surface-600 hover:text-surface-900')}>Monthly</button>
-            <button onClick={() => setInterval('year')} className={clsx('px-5 py-2.5 text-sm font-medium rounded-lg transition-colors', interval === 'year' ? 'bg-surface-900 text-white shadow-sm' : 'text-surface-600 hover:text-surface-900')}>Yearly <span className="text-emerald-500 font-semibold">Save ~15%</span></button>
+            <button onClick={() => setInterval('year')} className={clsx('px-5 py-2.5 text-sm font-medium rounded-lg transition-colors', interval === 'year' ? 'bg-surface-900 text-white shadow-sm' : 'text-surface-600 hover:text-surface-900')}>Yearly <span className="text-emerald-500 font-semibold">Save ~17%</span></button>
           </div>
         </div>
 

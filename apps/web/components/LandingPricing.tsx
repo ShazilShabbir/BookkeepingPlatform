@@ -23,8 +23,8 @@ const plans = [
   },
   {
     name: 'Pro',
-    monthlyPrice: '$19',
-    yearlyPrice: '$15',
+    monthlyPrice: '$10',
+    yearlyPrice: '$8',
     period: '/month',
     description: 'Ideal for small teams and growing businesses.',
     features: [
@@ -41,8 +41,8 @@ const plans = [
   },
   {
     name: 'Business',
-    monthlyPrice: '$49',
-    yearlyPrice: '$39',
+    monthlyPrice: '$25',
+    yearlyPrice: '$21',
     period: '/month',
     description: 'For organizations with advanced needs.',
     features: [

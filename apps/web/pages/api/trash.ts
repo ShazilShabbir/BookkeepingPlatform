@@ -1,13 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import TrashItem from '@/lib/models/TrashItem';
 import { logAction } from '@/lib/audit';
+import { requireAuth, checkCsrf } from '@/lib/auth';
+import { resolveUserIdFromQuery } from '@/lib/customerContext';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const uid = token.sub!;
+  if (req.method === 'DELETE' && !checkCsrf(req, res)) return;
+
+  const token = await requireAuth(req, res);
+  if (!token) return;
+  const uid = await resolveUserIdFromQuery(token, req);
 
   await dbConnect();
 

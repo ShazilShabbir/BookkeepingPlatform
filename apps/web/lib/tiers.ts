@@ -37,8 +37,8 @@ export const TIERS: Record<Tier, TierConfig> = {
   },
   pro: {
     label: 'Pro',
-    priceMonthly: 19,
-    priceYearly: 199,
+    priceMonthly: 10,
+    priceYearly: 100,
     stripePriceIdMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY || '',
     stripePriceIdYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_YEARLY || '',
     entryLimit: 1000,
@@ -59,8 +59,8 @@ export const TIERS: Record<Tier, TierConfig> = {
   },
   business: {
     label: 'Business',
-    priceMonthly: 49,
-    priceYearly: 499,
+    priceMonthly: 25,
+    priceYearly: 250,
     stripePriceIdMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_BUSINESS_MONTHLY || '',
     stripePriceIdYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_BUSINESS_YEARLY || '',
     entryLimit: -1, // unlimited

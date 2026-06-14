@@ -1,17 +1,19 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import JournalLine from '@/lib/models/JournalLine';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import mongoose from 'mongoose';
 import { logAction } from '@/lib/audit';
+import { requireAuth, checkCsrf } from '@/lib/auth';
+import { resolveUserId } from '@/lib/customerContext';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!checkCsrf(req, res)) return;
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  const uid = token.sub!;
+  const token = await requireAuth(req, res);
+  if (!token) return;
+  const uid = await resolveUserId(token, req.body.userId);
 
   await dbConnect();
 

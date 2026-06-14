@@ -91,42 +91,42 @@ export default function Dashboard() {
         <Tabs tabs={tabItems} activeTab={activeTab} onChange={setActiveTab} className="mb-8" />
 
         {activeTab === 'dashboard' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in" key={effectiveUserId}>
             <UnifiedDashboard userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'accounts' && (
-          <div className="animate-fade-in">
-            <ChartOfAccounts />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <ChartOfAccounts userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'reclassify' && (
-          <div className="animate-fade-in">
-            <ReclassifyEntries />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <ReclassifyEntries userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'import' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in" key={effectiveUserId}>
             {customerUid && (
               <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 Importing data for <strong>{customerName}</strong>
               </div>
             )}
-            <ImportCSV userId={effectiveUserId} />
+            <ImportCSV userId={effectiveUserId} customerUid={customerUid || undefined} />
           </div>
         )}
 
         {activeTab === 'transactions' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in" key={effectiveUserId}>
             {customerUid && (
               <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 Viewing transactions for <strong>{customerName}</strong>
               </div>
             )}
-            <SearchEntries userId={effectiveUserId} />
+            <SearchEntries userId={effectiveUserId} customerUid={customerUid || undefined} />
           </div>
         )}
 
@@ -137,37 +137,37 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'period-close' && (
-          <div className="animate-fade-in">
-            <PeriodClose />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <PeriodClose userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'reports' && (
-          <div className="animate-fade-in">
-            <ReportPanel />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <ReportPanel userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'schedules' && (
-          <div className="animate-fade-in">
-            <ScheduleManager />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <ScheduleManager userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'clients' && (
-          <div className="animate-fade-in">
-            <ClientManager />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <ClientManager userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'trash' && (
-          <div className="animate-fade-in">
-            <TrashPanel />
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <TrashPanel userId={effectiveUserId} />
           </div>
         )}
 
         {activeTab === 'reconciliation' && (
-          <div className="animate-fade-in">
+          <div className="animate-fade-in" key={effectiveUserId}>
             {customerUid && (
               <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
                 Reconciling data for <strong>{customerName}</strong>

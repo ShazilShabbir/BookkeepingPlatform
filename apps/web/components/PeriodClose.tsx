@@ -34,7 +34,7 @@ async function api(path: string, options?: RequestInit) {
   return res.json();
 }
 
-export default function PeriodClose() {
+export default function PeriodClose({ userId }: { userId: string }) {
   const [closedPeriods, setClosedPeriods] = useState<ClosedPeriod[]>([]);
   const [tier, setTier] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +44,7 @@ export default function PeriodClose() {
     setLoading(true);
     try {
       const [periodsJson, subJson] = await Promise.all([
-        api('/api/periods'),
+        api('/api/periods?userId=' + encodeURIComponent(userId)),
         api('/api/subscription'),
       ]);
       if (periodsJson.success) setClosedPeriods(periodsJson.data);
@@ -66,7 +66,7 @@ export default function PeriodClose() {
   const handleClose = async (ym: string) => {
     setBusy(ym);
     try {
-      const json = await api(`/api/periods/${ym}`, { method: 'POST' });
+      const json = await api(`/api/periods/${ym}`, { method: 'POST', body: JSON.stringify({ userId }) });
       if (json.success) {
         toast.success(`${formatMonth(ym)} closed`);
         loadData();
@@ -83,7 +83,7 @@ export default function PeriodClose() {
   const handleReopen = async (ym: string) => {
     setBusy(ym);
     try {
-      const json = await api(`/api/periods/${ym}`, { method: 'DELETE' });
+      const json = await api(`/api/periods/${ym}`, { method: 'DELETE', body: JSON.stringify({ userId }) });
       if (json.success) {
         toast.success(`${formatMonth(ym)} reopened`);
         loadData();

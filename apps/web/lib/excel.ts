@@ -559,7 +559,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   // Data bars on Revenue and Expenses columns
   if (vaRow > 2) {
     const revEnd = vaRow - 1;
-    const dataBarRule = (color: string) => ({ type: 'dataBar', priority: 1, dataBar: { color: { argb: color }, showValue: true } }) as any;
+    const dataBarRule = (color: string) => ({ type: 'dataBar', priority: 1, cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: color }, showValue: true } as any);
     va.addConditionalFormatting({ ref: `B2:B${revEnd}`, rules: [dataBarRule(palette.revenue)] });
     va.addConditionalFormatting({ ref: `C2:C${revEnd}`, rules: [dataBarRule(palette.expense)] });
     va.addConditionalFormatting({ ref: `D2:D${revEnd}`, rules: [dataBarRule(palette.accentGreen)] });
@@ -595,7 +595,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   if (topExpenses.length > 0) {
     va.addConditionalFormatting({
       ref: `G${expStart}:G${expEnd}`,
-      rules: [{ type: 'dataBar', priority: 1, dataBar: { color: { argb: palette.accentRed }, showValue: true } } as any],
+      rules: [{ type: 'dataBar', priority: 2, cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: palette.accentRed }, showValue: true } as any],
     });
   }
 

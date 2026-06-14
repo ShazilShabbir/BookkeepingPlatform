@@ -17,7 +17,7 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export default function RevenueChart() {
+export default function RevenueChart({ userId }: { userId: string }) {
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +25,7 @@ export default function RevenueChart() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/dashboard/trends?months=12');
+        const res = await fetch('/api/dashboard/trends?months=12&userId=' + encodeURIComponent(userId));
         const json = await res.json();
         if (json.success) setData(json.data);
       } catch (e) {

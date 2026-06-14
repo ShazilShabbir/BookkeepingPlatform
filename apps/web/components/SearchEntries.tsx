@@ -21,6 +21,7 @@ interface JournalEntryData {
   userId: string;
   date: string;
   description: string;
+  customFieldValues?: Record<string, any>;
   lines: JournalLineData[];
 }
 
@@ -42,9 +43,16 @@ interface DisplayEntry {
   category: string;
   lineCount: number;
   lines: JournalLineData[];
+  customFieldValues?: Record<string, any>;
 }
 
-export default function SearchEntries({ userId }: { userId: string }) {
+interface CustomFieldDef {
+  id: string;
+  label: string;
+  type: string;
+}
+
+export default function SearchEntries({ userId, customerUid }: { userId: string; customerUid?: string }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -60,18 +68,30 @@ export default function SearchEntries({ userId }: { userId: string }) {
   const [editForm, setEditForm] = useState({ date: '', description: '' });
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
   const [saving, setSaving] = useState(false);
+  const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!customerUid) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/customers?uid=${encodeURIComponent(customerUid)}`);
+        const json = await res.json();
+        if (json.success && json.data?.customFields) setCustomFieldDefs(json.data.customFields);
+      } catch {}
+    })();
+  }, [customerUid]);
 
   useEffect(() => {
     const loadAccounts = async () => {
       try {
-        const res = await fetch('/api/accounts');
+        const res = await fetch('/api/accounts?userId=' + encodeURIComponent(userId));
         const json = await res.json();
         if (json.success) setAccounts(json.data || []);
       } catch {}
     };
     loadAccounts();
-  }, []);
+  }, [userId]);
 
   const accountTypeMap = new Map(accounts.map(a => [a.code, a.type]));
 
@@ -104,6 +124,7 @@ export default function SearchEntries({ userId }: { userId: string }) {
       category: cat,
       lineCount: entry.lines.length,
       lines: entry.lines,
+      customFieldValues: entry.customFieldValues,
     };
   };
 
@@ -112,11 +133,12 @@ export default function SearchEntries({ userId }: { userId: string }) {
     try {
       const currentPage = append ? page + 1 : 1;
       const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query.trim());
+      if (query) params.set('q', query);
       if (typeFilter) params.set('type', typeFilter);
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
-      params.set('page', String(currentPage));
+      if (userId) params.set('userId', userId);
+      params.set('page', String(page));
       params.set('pageSize', '50');
 
       const res = await fetch(`/api/entries/search?${params.toString()}`);
@@ -180,7 +202,7 @@ export default function SearchEntries({ userId }: { userId: string }) {
       const body: Record<string, string> = {};
       if (editForm.date) body.date = editForm.date;
       if (editForm.description) body.description = editForm.description;
-      const res = await fetch(`/api/entries/${entryId}`, {
+      const res = await fetch(`/api/entries/${entryId}?userId=${encodeURIComponent(userId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -203,7 +225,7 @@ export default function SearchEntries({ userId }: { userId: string }) {
   const deleteEntry = async (entry: DisplayEntry) => {
     if (!confirm('Delete this entry? This action cannot be undone.')) return;
     try {
-      const res = await fetch(`/api/entries/${entry.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/entries/${entry.id}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Delete failed');
       toast.success('Entry deleted');
@@ -360,6 +382,26 @@ export default function SearchEntries({ userId }: { userId: string }) {
                             </tbody>
                           </table>
                         </div>
+                        {entry.customFieldValues && Object.keys(entry.customFieldValues).length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(entry.customFieldValues).map(([fieldId, val]) => {
+                              const def = customFieldDefs.find(d => d.id === fieldId);
+                              const typeColors: Record<string, string> = {
+                                text: 'bg-blue-50 text-blue-700 border-blue-200',
+                                number: 'bg-amber-50 text-amber-700 border-amber-200',
+                                date: 'bg-purple-50 text-purple-700 border-purple-200',
+                                boolean: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                              };
+                              const color = typeColors[def?.type || 'text'] || typeColors.text;
+                              return (
+                                <span key={fieldId} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${color}`}>
+                                  <span className="opacity-70">{def?.label || fieldId}:</span>
+                                  <span>{String(val)}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                         <div className="flex gap-2">
                           <Button size="sm" variant="ghost" onClick={() => startEdit(entry)}>Edit</Button>
                           <Button size="sm" variant="ghost" onClick={() => deleteEntry(entry)} className="text-red-600 hover:text-red-700">Delete</Button>
