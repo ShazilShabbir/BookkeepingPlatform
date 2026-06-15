@@ -23,12 +23,12 @@ function KpiCard({ label, value, prefix = '', suffix = '', color, bgColor, icon 
   label: string; value: number; prefix?: string; suffix?: string; color: string; bgColor: string; icon: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-surface-200 p-5">
+    <div className="bg-white rounded-xl border border-surface-200 p-4 sm:p-5">
       <div className="flex items-start justify-between mb-3">
         <div className={`p-2.5 rounded-lg ${bgColor} ${color}`}>{icon}</div>
       </div>
       <p className="text-sm text-surface-500 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{prefix}{value.toFixed(suffix === '%' ? 1 : 2)}{suffix}</p>
+      <p className={`text-xl sm:text-2xl font-bold ${color} truncate`}>{prefix}{value.toFixed(suffix === '%' ? 1 : 2)}{suffix}</p>
     </div>
   );
 }
@@ -131,25 +131,29 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <label className="block text-xs font-medium text-surface-500 mb-1">Start Date</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            className="border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <div className="flex-1 sm:flex-none">
+            <label className="block text-xs font-medium text-surface-500 mb-1">Start Date</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              className="w-full sm:w-auto border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+          </div>
+          <div className="flex-1 sm:flex-none">
+            <label className="block text-xs font-medium text-surface-500 mb-1">End Date</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+              className="w-full sm:w-auto border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-surface-500 mb-1">End Date</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            className="border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => fetchData()} loading={loading}>Run Report</Button>
+          <ShareButton />
+          <Button onClick={handleDownloadExcel} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Download Excel
+          </Button>
         </div>
-        <Button onClick={() => fetchData()} loading={loading}>Run Report</Button>
-        <ShareButton />
-        <Button onClick={handleDownloadExcel} className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Download Excel
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -162,8 +166,8 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
           <RevenueChart userId={userId} />
           <ExpenseChart userId={userId} />
         </div>

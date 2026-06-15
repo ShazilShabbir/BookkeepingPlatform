@@ -540,7 +540,7 @@ export default function Reconcile({ userId }: { userId: string }) {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-center text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-sm">
               <div><p className="text-surface-500">Matched</p><p className="text-lg font-bold text-emerald-600">{stats.matchedCount || 0}</p></div>
               <div><p className="text-surface-500">Unmatched</p><p className="text-lg font-bold text-red-600">{stats.unmatchedCount || 0}</p></div>
               <div><p className="text-surface-500">Excluded</p><p className="text-lg font-bold text-surface-400">{stats.excludedCount || 0}</p></div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button } from '@/components/ui';
+import { Card, Button, EmptyState } from '@/components/ui';
 import toast from 'react-hot-toast';
 
 interface TrashItemData {
@@ -69,12 +69,15 @@ export default function TrashPanel({ userId }: { userId: string }) {
         {loading ? (
           <div className="text-center py-8 text-surface-400">Loading trash...</div>
         ) : items.length === 0 ? (
-          <div className="text-center py-12">
-            <svg className="w-12 h-12 mx-auto mb-3 text-surface-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            <p className="text-surface-400 text-sm">Trash is empty.</p>
-          </div>
+          <EmptyState
+            icon={
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            }
+            title="Trash is empty"
+            description="Deleted items appear here and are kept for 30 days."
+          />
         ) : (
           <div className="space-y-2">
             {items.map(item => (

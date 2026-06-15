@@ -944,7 +944,7 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
         <div className="h-full bg-primary-600 rounded-full transition-all duration-500" style={{ width: `${percent}%` }} />
       </div>
       {job && (
-        <div className="grid grid-cols-4 gap-4 text-center text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-sm">
           <div><p className="font-semibold text-surface-900">{(job.importedEntries || 0).toLocaleString()}</p><p className="text-surface-500">Imported</p></div>
           <div><p className="font-semibold text-surface-900">{(job.skippedRows || 0).toLocaleString()}</p><p className="text-surface-500">Skipped</p></div>
           <div><p className="font-semibold text-surface-900">{(job.duplicatesSkipped || 0).toLocaleString()}</p><p className="text-surface-500">Duplicates</p></div>

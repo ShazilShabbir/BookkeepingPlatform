@@ -7,8 +7,6 @@ import Navbar from '@/components/Navbar';
 import LandingNavbar from '@/components/LandingNavbar';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ui';
-import Head from 'next/head';
-import Script from 'next/script';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || 'G-XXXXXXXXXX';
 
@@ -43,36 +41,22 @@ function AuthSync({ children, pathname }: { children: React.ReactNode; pathname:
 function MyApp({ Component, pageProps: { session, ...pageProps }, router }: AppProps) {
   const isAuthPage = ['login', 'signup'].includes(router.pathname.split('/')[1]);
 
+  useEffect(() => {
+    if (GA_ID === 'G-XXXXXXXXXX') return;
+    const w = window as any;
+    w.dataLayer = w.dataLayer || [];
+    w.gtag = function(...args: any[]) { w.dataLayer.push(args); };
+    w.gtag('js', new Date());
+    w.gtag('config', GA_ID, { page_path: window.location.pathname });
+
+    const script = document.createElement('script');
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+    script.async = true;
+    document.head.appendChild(script);
+  }, []);
+
   return (
     <SessionProvider session={session}>
-      <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="canonical" href="https://bookkeep.app" />
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <meta name="description" content="Sales analytics and bookkeeping platform. Track revenue, expenses, and profit margins in real time." />
-        <meta name="theme-color" content="#4f46e5" />
-        <meta name="msapplication-TileColor" content="#4f46e5" />
-        <meta property="og:type" content="website" />
-        <meta property="og:locale" content="en_US" />
-        <meta property="og:site_name" content="BookKeep" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@bookkeep_app" />
-      </Head>
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script id="google-analytics" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${GA_ID}', { page_path: window.location.pathname });
-        `}
-      </Script>
       <AuthSync pathname={router.pathname}>
         <Toaster
           position="top-right"
@@ -89,11 +73,6 @@ function MyApp({ Component, pageProps: { session, ...pageProps }, router }: AppP
             <ErrorBoundary>
               <Component {...pageProps} />
             </ErrorBoundary>
-            {GA_ID !== 'G-XXXXXXXXXX' && (
-              <Script id="ga-pageview" strategy="afterInteractive">
-                {`gtag('config', '${GA_ID}', { page_path: window.location.pathname });`}
-              </Script>
-            )}
           </main>
         </div>
       </AuthSync>

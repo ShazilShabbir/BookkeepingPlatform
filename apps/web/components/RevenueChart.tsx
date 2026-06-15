@@ -43,7 +43,8 @@ export default function RevenueChart({ userId }: { userId: string }) {
     <Card padding="md">
       <h3 className="text-lg font-semibold text-surface-900 mb-6">Revenue Trend (12 Months)</h3>
       {data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={260}>
+        <div className="h-[200px] sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
             <defs>
               <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
@@ -58,7 +59,8 @@ export default function RevenueChart({ userId }: { userId: string }) {
             <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} />
           </AreaChart>
         </ResponsiveContainer>
-      ) : (
+        </div>
+        ) : (
         <div className="flex flex-col items-center justify-center py-12 text-surface-400">
           <p className="text-sm">No revenue data</p>
         </div>

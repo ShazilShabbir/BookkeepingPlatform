@@ -200,7 +200,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
     const kids = childrenOf(account.code).filter(c => filtered.includes(c));
     return (
       <div key={account.code}>
-        <div className="flex items-center justify-between px-4 py-2.5 bg-white rounded-lg border border-surface-200 hover:border-surface-300 transition-colors" style={{ marginLeft: depth * 20 }}>
+        <div className="flex items-center justify-between px-4 py-2.5 bg-white rounded-lg border border-surface-200 hover:border-surface-300 transition-colors" style={{ marginLeft: Math.min(depth * 20, 100) }}>
           <div className="flex items-center gap-3 min-w-0 flex-1">
             {depth > 0 && (
               <svg className="w-3 h-3 text-surface-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -259,7 +259,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
               }
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button onClick={handleExport} variant="secondary">
               <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

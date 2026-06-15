@@ -44,12 +44,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const statements = await getFinancialStatements((schedule as any).userId);
         const html = generateReportHTML(statements, ownerName, shareLink);
+        const workbook = await generateWorkbook((schedule as any).userId);
+        const buffer = await workbook.xlsx.writeBuffer();
+        const base64 = (buffer as any).toString('base64');
 
         await (resend.emails.send as any)({
           from: 'BookKeep <onboarding@resend.dev>',
           to: (user as any).email,
           subject: `Scheduled Financial Report - ${(schedule as any).frequency}`,
           html,
+          attachments: [{ filename: 'financial-report.xlsx', content: base64, content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }],
         });
         sent++;
       } catch (e) {

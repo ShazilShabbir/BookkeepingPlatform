@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUserStore, useCustomerStore } from '@/lib/store';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
@@ -14,8 +14,10 @@ import ReportPanel from '@/components/ReportPanel';
 import ScheduleManager from '@/components/ScheduleManager';
 import ClientManager from '@/components/ClientManager';
 import TrashPanel from '@/components/TrashPanel';
+import TeamMembers from '@/components/TeamMembers';
 import { Tabs } from '@/components/ui';
 import Head from 'next/head';
+import { useKeyboardShortcuts, useShortcutGuide } from '@/hooks/useKeyboardShortcuts';
 
 const tabItems = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -28,6 +30,7 @@ const tabItems = [
   { id: 'period-close', label: 'Period Close' },
   { id: 'reports', label: 'Reports' },
   { id: 'schedules', label: 'Schedules' },
+  { id: 'team', label: 'Team' },
   { id: 'clients', label: 'Clients' },
   { id: 'trash', label: 'Trash' },
 ];
@@ -41,10 +44,27 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const effectiveUserId = useMemo(() => customerUid || user?.id || '', [customerUid, user?.id]);
+  const { open: guideOpen, setOpen: setGuideOpen, guide } = useShortcutGuide();
+
+  const handleKeyShortcut = useCallback((searchInputRef?: React.RefObject<HTMLInputElement | null>) => {
+    return {
+      '/': () => {
+        const input = document.querySelector<HTMLInputElement>('input[type="search"], input[placeholder*="Search"]');
+        input?.focus();
+      },
+      n: () => setActiveTab('import'),
+      d: () => setActiveTab('dashboard'),
+      t: () => setActiveTab('transactions'),
+      '?': () => setGuideOpen(true),
+      Escape: () => setGuideOpen(false),
+    };
+  }, [setGuideOpen]);
+
+  useKeyboardShortcuts(handleKeyShortcut());
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ['accounts', 'reclassify', 'import', 'transactions', 'customers', 'reconciliation', 'period-close', 'reports', 'schedules', 'clients', 'trash'].includes(tab)) {
+    if (tab && ['accounts', 'reclassify', 'import', 'transactions', 'customers', 'reconciliation', 'period-close', 'reports', 'schedules', 'team', 'clients', 'trash'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
@@ -57,7 +77,7 @@ export default function Dashboard() {
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[40vh] sm:min-h-[60vh]">
         <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full" />
       </div>
     );
@@ -65,7 +85,7 @@ export default function Dashboard() {
 
   if (!session || !user) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[40vh] sm:min-h-[60vh]">
         <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full" />
       </div>
     );
@@ -77,7 +97,7 @@ export default function Dashboard() {
         <title>Dashboard | BookKeep</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <div className="py-8 animate-fade-in">
+      <div className="py-4 sm:py-8 animate-fade-in overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -154,6 +174,12 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === 'team' && (
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <TeamMembers />
+          </div>
+        )}
+
         {activeTab === 'clients' && (
           <div className="animate-fade-in" key={effectiveUserId}>
             <ClientManager userId={effectiveUserId} />
@@ -176,6 +202,7 @@ export default function Dashboard() {
             <Reconcile userId={effectiveUserId} />
           </div>
         )}
+        {guide}
       </div>
     </div>
     </>

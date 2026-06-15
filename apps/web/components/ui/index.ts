@@ -5,4 +5,6 @@ export { Badge } from './Badge';
 export { Tabs } from './Tabs';
 export { Skeleton, MetricCardSkeleton, ChartSkeleton } from './Skeleton';
 export { ErrorBoundary } from './ErrorBoundary';
+export { Modal } from './Modal';
+export { EmptyState } from './EmptyState';
 export { default as Accordion } from '@/components/Accordion';

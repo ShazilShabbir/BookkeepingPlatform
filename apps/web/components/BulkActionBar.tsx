@@ -21,7 +21,7 @@ export default function BulkActionBar({ selectedCount, actions, onClear }: BulkA
       <span className="text-sm font-medium">
         {selectedCount} selected
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {actions.map((action, i) => (
           <Button
             key={i}

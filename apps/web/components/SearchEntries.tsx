@@ -245,7 +245,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
     <div className="space-y-6">
       <Card padding="md">
         <form onSubmit={handleSearch} className="space-y-4">
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -341,7 +341,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
                   <div className="px-4 pb-3 pt-1 border-t border-surface-100 bg-surface-50/50">
                     {editingId === entry.id ? (
                       <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs text-surface-500 block mb-1">Date</label>
                             <input type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
@@ -353,7 +353,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
                               className="w-full text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white" />
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button size="sm" onClick={() => saveEdit(entry.id)} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
                           <Button size="sm" variant="secondary" onClick={cancelEdit}>Cancel</Button>
                         </div>
@@ -402,7 +402,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
                             })}
                           </div>
                         )}
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="ghost" onClick={() => startEdit(entry)}>Edit</Button>
                           <Button size="sm" variant="ghost" onClick={() => deleteEntry(entry)} className="text-red-600 hover:text-red-700">Delete</Button>
                         </div>

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { Modal, Button } from '@/components/ui';
 
 interface ShareButtonProps {
   disabled?: boolean;
@@ -59,59 +60,42 @@ export default function ShareButton({ disabled }: ShareButtonProps) {
         Share
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-elevated border border-surface-200 w-full max-w-lg p-6 animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-surface-900">Share Financial Report</h3>
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-surface-100 text-surface-400">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Share Financial Report" size="lg">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full" />
+          </div>
+        ) : shareUrl ? (
+          <div className="space-y-4">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-700">
+              Anyone with this link can view the financial report. Links never expire.
             </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full" />
-              </div>
-            ) : shareUrl ? (
-              <div className="space-y-4">
-                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 text-sm text-indigo-700">
-                  Anyone with this link can view the financial report. Links never expire.
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-surface-500 mb-1">Shareable Link</label>
-                  <div className="flex gap-2">
-                    <input readOnly value={shareUrl}
-                      className="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm bg-surface-50 font-mono text-surface-700" />
-                    <button onClick={handleCopy}
-                      className={clsx('px-4 py-2 text-sm font-medium rounded-lg transition-colors', copied ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-100 text-surface-700 hover:bg-surface-200')}>
-                      {copied ? 'Copied!' : 'Copy'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-surface-200">
-                  <p className="text-sm text-surface-500">
-                    Recipients see the report for <strong className="text-surface-700">{clientName}</strong>
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-sm text-surface-500 mb-4">No share link available. Create a client first.</p>
-                <button onClick={() => setOpen(false)}
-                  className="px-4 py-2 bg-surface-100 text-surface-700 text-sm font-medium rounded-lg hover:bg-surface-200">
-                  Close
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-1">Shareable Link</label>
+              <div className="flex gap-2">
+                <input readOnly value={shareUrl}
+                  className="flex-1 border border-surface-200 rounded-lg px-3 py-2 text-sm bg-surface-50 font-mono text-surface-700" />
+                <button onClick={handleCopy}
+                  className={clsx('px-4 py-2 text-sm font-medium rounded-lg transition-colors', copied ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-100 text-surface-700 hover:bg-surface-200')}>
+                  {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-            )}
+            </div>
+
+            <div className="pt-4 border-t border-surface-200">
+              <p className="text-sm text-surface-500">
+                Recipients see the report for <strong className="text-surface-700">{clientName}</strong>
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-sm text-surface-500 mb-4">No share link available. Create a client first.</p>
+            <Button variant="secondary" onClick={() => setOpen(false)}>Close</Button>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

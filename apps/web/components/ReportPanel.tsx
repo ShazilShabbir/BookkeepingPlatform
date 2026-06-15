@@ -181,7 +181,7 @@ export default function ReportPanel({ userId }: { userId: string }) {
           </div>
         ))}
         <div className="p-4 bg-surface-50 rounded-xl border border-surface-200">
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
             <div><p className="text-xs text-surface-500 uppercase tracking-wider font-medium">Total Assets</p><p className="text-xl font-bold text-primary-600 mt-1">{fmt(balanceSheet.totalAssets)}</p></div>
             <div><p className="text-xs text-surface-500 uppercase tracking-wider font-medium">Total Liabilities</p><p className="text-xl font-bold text-amber-600 mt-1">{fmt(balanceSheet.totalLiabilities)}</p></div>
             <div><p className="text-xs text-surface-500 uppercase tracking-wider font-medium">Total Equity</p><p className="text-xl font-bold text-emerald-600 mt-1">{fmt(balanceSheet.totalEquity)}</p></div>
@@ -330,7 +330,8 @@ export default function ReportPanel({ userId }: { userId: string }) {
           </Button>
         </div>
 
-        <div className="flex gap-1 border-b border-surface-200 mb-6">
+        <div className="overflow-x-auto scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0 mb-6">
+          <div className="flex gap-1 border-b border-surface-200 min-w-max">
           {tabs.filter(t => t.id === 'all' || t.id === 'pl' || t.id === 'bs' || (t.id === 'cf' && data?.cashFlow) || (t.id === 'tb' && data?.trialBalance)).map(t => (
             <button
               key={t.id}
@@ -344,6 +345,7 @@ export default function ReportPanel({ userId }: { userId: string }) {
               {t.label}
             </button>
           ))}
+          </div>
         </div>
 
         {loading ? (

@@ -43,7 +43,8 @@ export default function ExpenseChart({ userId }: { userId: string }) {
     <Card padding="md">
       <h3 className="text-lg font-semibold text-surface-900 mb-6">Expenses Trend (12 Months)</h3>
       {data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={260}>
+        <div className="h-[200px] sm:h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
@@ -52,7 +53,8 @@ export default function ExpenseChart({ userId }: { userId: string }) {
             <Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
           </BarChart>
         </ResponsiveContainer>
-      ) : (
+        </div>
+        ) : (
         <div className="flex flex-col items-center justify-center py-12 text-surface-400">
           <p className="text-sm">No expense data</p>
         </div>
