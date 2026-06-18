@@ -18,6 +18,9 @@ export interface IUser extends Document {
   currentPeriodEnd: Date;
   createdAt: Date;
   updatedAt: Date;
+  totpSecret?: string;
+  totpEnabled?: boolean;
+  totpBackupCodes?: string[];
 }
 
 const UserSchema = new Schema<IUser>({
@@ -37,6 +40,9 @@ const UserSchema = new Schema<IUser>({
   currentPeriodEnd: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  totpSecret: { type: String, default: undefined },
+  totpEnabled: { type: Boolean, default: false },
+  totpBackupCodes: { type: [String], default: undefined },
 });
 
 UserSchema.pre('save', function (next) {

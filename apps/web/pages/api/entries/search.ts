@@ -5,8 +5,9 @@ import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { withRateLimit } from '@/lib/apiRateLimit';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = await resolveUserIdFromQuery(token, req);
@@ -41,15 +42,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .limit(pageSize)
       .lean();
 
-    const results = [];
-    for (const entry of entries) {
-      const lines = await JournalLine.find({ journalEntryId: (entry as any)._id.toString(), userId: uid }).lean();
-      results.push({ ...entry, lines });
+    const entryIds = entries.map(e => (e as any)._id.toString());
+    const allLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+    const linesByEntry = new Map<string, any[]>();
+    for (const line of allLines) {
+      const eid = line.journalEntryId.toString();
+      if (!linesByEntry.has(eid)) linesByEntry.set(eid, []);
+      linesByEntry.get(eid)!.push(line);
     }
+
+    const data = entries.map(e => ({ ...e, lines: linesByEntry.get((e as any)._id.toString()) || [] }));
 
     return res.status(200).json({
       success: true,
-      data: results,
+      data,
       page,
       pageSize,
       total,
@@ -88,18 +94,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .limit(pageSize)
     .lean();
 
-  const results = [];
-  for (const entry of entries) {
-    const lines = await JournalLine.find({ journalEntryId: (entry as any)._id.toString(), userId: uid }).lean();
-    results.push({ ...entry, lines });
+  const entryIds = entries.map(e => (e as any)._id.toString());
+  const allLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+  const linesByEntry = new Map<string, any[]>();
+  for (const line of allLines) {
+    const eid = line.journalEntryId.toString();
+    if (!linesByEntry.has(eid)) linesByEntry.set(eid, []);
+    linesByEntry.get(eid)!.push(line);
   }
+
+  const data = entries.map(e => ({ ...e, lines: linesByEntry.get((e as any)._id.toString()) || [] }));
 
   return res.status(200).json({
     success: true,
-    data: results,
+    data,
     page,
     pageSize,
     total,
     hasMore: page * pageSize < total,
   });
 }
+
+export default withRateLimit(handler);

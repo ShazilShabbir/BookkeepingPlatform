@@ -7,6 +7,7 @@ export interface IImportJob extends Omit<Document, 'errors'> {
   totalRows: number;
   processedRows: number;
   filePath?: string;
+  content?: string;
   mapping?: Record<string, string>;
   csvMapping?: Record<string, any>;
   csvProfileName?: string;
@@ -32,6 +33,7 @@ const ImportJobSchema = new Schema<IImportJob>({
   totalRows: { type: Number, default: 0 },
   processedRows: { type: Number, default: 0 },
   filePath: { type: String, default: null },
+  content: { type: String, default: null },
   mapping: { type: Schema.Types.Mixed, default: null },
   csvMapping: { type: Schema.Types.Mixed, default: null },
   csvProfileName: { type: String, default: null },

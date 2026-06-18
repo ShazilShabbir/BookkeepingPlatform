@@ -2,7 +2,7 @@ const steps = [
   {
     number: '01',
     title: 'Import Your Data',
-    description: 'Upload CSV files or connect bank accounts. Our smart parser automatically categorizes and validates every transaction.',
+    description: 'Upload CSV, Excel, or PDF files. Our smart parser automatically categorizes and validates every transaction.',
     gradient: 'from-primary-500 to-primary-600',
     illustration: (
       <svg className="w-full h-full" viewBox="0 0 200 160" fill="none">

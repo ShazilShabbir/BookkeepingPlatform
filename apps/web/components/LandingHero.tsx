@@ -35,7 +35,7 @@ export default function LandingHero() {
               </span>
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-surface-400 leading-relaxed max-w-lg">
-              Import CSV data, reconcile transactions, and generate powerful reports in minutes. No accounting degree required.
+              Import CSV, Excel, and PDF data. Reconcile transactions. Generate powerful reports in minutes. No accounting degree required.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-4">

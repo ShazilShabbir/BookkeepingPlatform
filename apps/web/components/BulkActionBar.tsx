@@ -35,7 +35,7 @@ export default function BulkActionBar({ selectedCount, actions, onClear }: BulkA
         ))}
         <button
           onClick={onClear}
-          className="ml-2 text-xs text-surface-400 hover:text-white transition-colors"
+          className="sm:ml-2 ml-1 text-xs text-surface-400 hover:text-white transition-colors"
         >
           Cancel
         </button>

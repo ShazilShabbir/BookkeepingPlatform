@@ -7,8 +7,9 @@ import mongoose from 'mongoose';
 import { logAction, trashItem } from '@/lib/audit';
 import { requireAuth, checkCsrf } from '@/lib/auth';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { withRateLimit } from '@/lib/apiRateLimit';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if ((req.method === 'PUT' || req.method === 'DELETE') && !checkCsrf(req, res)) return;
 
   const token = await requireAuth(req, res);
@@ -81,3 +82,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withRateLimit(handler);

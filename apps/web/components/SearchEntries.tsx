@@ -263,25 +263,25 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
               {loading ? 'Searching...' : 'Search'}
             </Button>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3">
             <select
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value)}
-              className="text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700"
+              className="w-full sm:w-auto text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700"
             >
               <option value="">All Types</option>
               <option value="income">Income</option>
               <option value="expense">Expense</option>
             </select>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-surface-500">From</label>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-surface-500 shrink-0">From</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                className="text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700" />
+                className="flex-1 sm:flex-none text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700" />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-surface-500">To</label>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-surface-500 shrink-0">To</label>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                className="text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700" />
+                className="flex-1 sm:flex-none text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700" />
             </div>
             {searched && (
               <button type="button" onClick={clearFilters} className="text-xs text-primary-600 hover:underline self-center ml-auto">

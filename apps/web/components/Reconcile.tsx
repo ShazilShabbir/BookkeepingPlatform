@@ -233,7 +233,7 @@ export default function Reconcile({ userId }: { userId: string }) {
     <div className="space-y-6">
       <Card padding="lg">
         <h2 className="text-lg font-semibold text-surface-900 mb-4">New Bank Reconciliation</h2>
-        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Cash Account</label>
             <select value={accountCode} onChange={e => setAccountCode(e.target.value)}

@@ -10,9 +10,9 @@ import CategoryMapping from '@/lib/models/CategoryMapping';
 import { KEYWORD_RULES, classifyRow, cleanDate } from '@/lib/classify';
 import { checkEntryLimit } from '@/lib/subscription';
 import Papa from 'papaparse';
-import { readFileSync, unlinkSync, existsSync } from 'fs';
 import { resolveUserId } from '@/lib/customerContext';
 import type { CsvMapping } from '@/lib/types';
+import { withRateLimit } from '@/lib/apiRateLimit';
 
 function levenshteinDistance(a: string, b: string): number {
   const m = a.length, n = b.length;
@@ -67,7 +67,7 @@ function parseAmounts(row: Record<string, string>, amountCol: string, costCol: s
   return { revenueAmount: amt, expenseAmount: cost };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -86,10 +86,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const job = await ImportJob.findOne({ _id: jobId, userId: uid }).lean();
     if (!job) return res.status(404).json({ error: 'Job not found' });
 
-    const filePath = (job as any).filePath;
-    if (!filePath || !existsSync(filePath)) {
-      await ImportJob.findByIdAndUpdate(jobId, { $set: { status: 'failed', errors: [{ row: 0, reason: 'File not found' }] } });
-      return res.status(500).json({ error: 'File not found' });
+    const content = (job as any).content;
+    if (!content) {
+      await ImportJob.findByIdAndUpdate(jobId, { $set: { status: 'failed', errors: [{ row: 0, reason: 'Content not found' }] } });
+      return res.status(500).json({ error: 'Import content not found' });
     }
 
     const excludedRows: number[] = (job as any).excludedRows || [];
@@ -142,7 +142,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await ImportJob.findByIdAndUpdate(jobId, { $set: { status: 'processing', startedAt: new Date() } });
 
-    const content = readFileSync(filePath, 'utf-8');
     const parsed = Papa.parse(content, { header: true, skipEmptyLines: true });
     const allRows = parsed.data as Record<string, string>[];
 
@@ -317,8 +316,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    try { unlinkSync(filePath); } catch {}
-
     await ImportJob.findByIdAndUpdate(jobId, {
       $set: {
         status: 'completed', processedRows, importedEntries, skippedRows, duplicatesSkipped, duplicateRows,
@@ -336,3 +333,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ success: false, error: errMsg });
   }
 }
+
+export default withRateLimit(handler);

@@ -7,7 +7,7 @@ const faqs = [
   },
   {
     question: 'What file formats are supported?',
-    answer: 'We support CSV files for bulk import. Our smart parser automatically detects columns, formats, and categories. Excel (.xlsx) export is available for reports. Bank statement CSV files are supported for reconciliation.',
+    answer: 'We support CSV, Excel (.xlsx), and PDF files for bulk import. Our smart parser automatically detects columns, formats, and categories across all file types. Excel and PDF export are also available for reports.',
   },
   {
     question: 'Can I try BookKeep for free?',

@@ -11,9 +11,9 @@ const features = [
     ),
   },
   {
-    title: 'CSV Import',
-    description: 'Bulk-import sales data from CSV files with automatic categorization, validation, and error detection.',
-    highlight: 'Auto-categorization',
+    title: 'Multi-Format Import',
+    description: 'Import sales data from CSV, Excel, or PDF files with automatic categorization, validation, and error detection.',
+    highlight: 'CSV, Excel, PDF',
     gradient: 'from-emerald-500 to-emerald-600',
     icon: (
       <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

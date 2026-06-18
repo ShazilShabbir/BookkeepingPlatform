@@ -4,12 +4,30 @@ import bcrypt from 'bcryptjs';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
 import { checkLoginRateLimit } from '@/lib/rateLimit';
+import { verifyTOTP } from '@/lib/totp';
+import * as crypto from 'crypto';
 
 interface UserWithRole {
   id: string;
   email: string;
   name: string;
   role: string;
+}
+
+const PREAUTH_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-change-me';
+
+function verifyPreAuthToken(token: string): { sub: string; email: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const sig = crypto.createHmac('sha256', PREAUTH_SECRET).update(`${parts[0]}.${parts[1]}`).digest('base64url');
+    if (sig !== parts[2]) return null;
+    const body = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    if (Date.now() > body.exp) return null;
+    return { sub: body.sub, email: body.email };
+  } catch {
+    return null;
+  }
 }
 
 export const authOptions: NextAuthOptions = {
@@ -19,6 +37,8 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        preAuthToken: { label: 'Pre-Auth Token', type: 'text' },
+        totpToken: { label: 'TOTP Code', type: 'text' },
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -31,12 +51,49 @@ export const authOptions: NextAuthOptions = {
           if (!allowed) return null;
 
           await dbConnect();
+
+          if (credentials.preAuthToken) {
+            const preAuth = verifyPreAuthToken(credentials.preAuthToken);
+            if (!preAuth) return null;
+
+            const user = await User.findById(preAuth.sub).lean();
+            if (!user) return null;
+            const u = user as any;
+
+            if (!u.totpEnabled) return null;
+
+            if (!credentials.totpToken || !verifyTOTP(credentials.totpToken, u.totpSecret)) {
+              if (u.totpBackupCodes && credentials.totpToken) {
+                const idx = u.totpBackupCodes.indexOf(credentials.totpToken);
+                if (idx >= 0) {
+                  u.totpBackupCodes.splice(idx, 1);
+                  await User.findByIdAndUpdate(preAuth.sub, { totpBackupCodes: u.totpBackupCodes });
+                } else {
+                  return null;
+                }
+              } else {
+                return null;
+              }
+            }
+
+            return {
+              id: u._id.toString(),
+              email: u.email,
+              name: u.name,
+              role: u.role || 'admin',
+            };
+          }
+
           const user = await User.findOne({ email: credentials.email.toLowerCase() }).lean();
           if (!user) return null;
           const u = user as any;
           const valid = await bcrypt.compare(credentials.password, u.password);
           if (!valid) return null;
-          
+
+          if (u.totpEnabled) {
+            return null;
+          }
+
           const userWithRole: UserWithRole = {
             id: u._id.toString(),
             email: u.email,

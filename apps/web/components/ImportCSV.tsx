@@ -294,43 +294,62 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
   }
 
   const startAnalysis = useCallback(async (f: File) => {
-    if (!f.name.endsWith('.csv')) { toast.error('Please select a CSV file'); return; }
+    const ext = f.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['csv', 'xlsx', 'xls', 'pdf'].includes(ext)) {
+      toast.error('Please select a CSV, Excel, or PDF file');
+      return;
+    }
     reset();
     abortRef.current = false;
     setFile(f);
     setStep('analyzing');
 
     let content: string;
+    let rows: Record<string, string>[];
+
     try {
-      content = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsText(f);
-      });
-    } catch {
-      toast.error('Could not read file');
+      toast.remove();
+      const toastId = toast.loading(`Parsing ${(f.size / 1024 / 1024).toFixed(1)}MB file...`);
+      await new Promise<void>(resolve => setTimeout(resolve, 30));
+
+      if (ext === 'csv') {
+        content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsText(f);
+        });
+
+        const parsed = Papa.parse(content, { header: true, skipEmptyLines: true });
+        if (parsed.errors?.length > 0) console.warn('CSV parse warnings:', parsed.errors);
+        rows = parsed.data as Record<string, string>[];
+      } else {
+        const uploadPath = ext === 'pdf' ? '/api/parse-pdf-import' : '/api/parse-excel-import';
+        const formData = new FormData();
+        formData.append('file', f);
+
+        const parseRes = await fetch(uploadPath, {
+          method: 'POST',
+          body: f,
+        });
+        const parseJson = await parseRes.json();
+
+        if (!parseJson.success) {
+          throw new Error(parseJson.error || `Failed to parse ${ext.toUpperCase()} file`);
+        }
+
+        rows = parseJson.data.rows || [];
+        content = Papa.unparse(rows);
+      }
+
+      toast.dismiss(toastId);
+    } catch (e: any) {
+      toast.error('Failed to parse file: ' + (e.message || 'unknown error'));
       setStep('idle');
       return;
     }
     if (abortRef.current) return;
     setFileContent(content);
-
-    let rows: Record<string, string>[];
-    try {
-      toast.remove();
-      const toastId = toast.loading(`Parsing ${(f.size / 1024 / 1024).toFixed(1)}MB file...`);
-      await new Promise<void>(resolve => setTimeout(resolve, 30));
-      const parsed = Papa.parse(content, { header: true, skipEmptyLines: true });
-      if (parsed.errors?.length > 0) console.warn('CSV parse warnings:', parsed.errors);
-      rows = parsed.data as Record<string, string>[];
-      toast.dismiss(toastId);
-    } catch (e: any) {
-      toast.error('Failed to parse CSV: ' + (e.message || 'unknown error'));
-      setStep('idle');
-      return;
-    }
-    if (abortRef.current) return;
 
     if (rows.length === 0) {
       toast.error('CSV file contains no data rows');
@@ -528,15 +547,15 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
 
   const renderDropZone = () => (
     <div onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
-      className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${dragOver ? 'border-primary-500 bg-primary-50/50' : 'border-surface-300 hover:border-surface-400 bg-surface-50/50'}`}>
-      <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
+      className={`relative border-2 border-dashed rounded-xl p-6 sm:p-12 text-center transition-all duration-200 ${dragOver ? 'border-primary-500 bg-primary-50/50' : 'border-surface-300 hover:border-surface-400 bg-surface-50/50'}`}>
+      <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls,.pdf" onChange={handleFileChange} className="hidden" />
       <div className="mb-4">
         <svg className="w-12 h-12 text-surface-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
         </svg>
       </div>
-      <p className="text-base font-semibold text-surface-900 mb-1">Drop your CSV here, or click to browse</p>
-      <p className="text-sm text-surface-500 mb-6">Supports any CSV format — columns are auto-detected</p>
+      <p className="text-base font-semibold text-surface-900 mb-1">Drop your file here, or click to browse</p>
+      <p className="text-sm text-surface-500 mb-6">Supports CSV, Excel (.xlsx), and PDF files — columns are auto-detected</p>
       <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>Choose File</Button>
     </div>
   );

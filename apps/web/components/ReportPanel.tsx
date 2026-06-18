@@ -310,19 +310,19 @@ export default function ReportPanel({ userId }: { userId: string }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <Card padding="lg">
-        <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div>
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-3 mb-6">
+          <div className="w-full sm:w-auto">
             <label className="block text-xs font-medium text-surface-500 mb-1">Start Date</label>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              className="w-full sm:w-auto border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="block text-xs font-medium text-surface-500 mb-1">End Date</label>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              className="border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              className="w-full sm:w-auto border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
           </div>
-          <Button onClick={fetchData} loading={loading}>Run Report</Button>
-          <Button onClick={handleDownload} loading={downloading} variant="secondary" className="flex items-center gap-2">
+          <Button onClick={fetchData} loading={loading} className="w-full sm:w-auto">Run Report</Button>
+          <Button onClick={handleDownload} loading={downloading} variant="secondary" className="w-full sm:w-auto flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>

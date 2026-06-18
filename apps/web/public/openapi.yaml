@@ -1,0 +1,789 @@
+openapi: "3.0.3"
+info:
+  title: BookKeep API
+  description: REST API for BookKeep — bookkeeping, reconciliation, reports, and team management.
+  version: "1.0.0"
+  contact:
+    email: support@bookkeep.app
+
+servers:
+  - url: https://bookkeep.app/api
+    description: Production
+  - url: http://localhost:3000/api
+    description: Development
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+
+    Account:
+      type: object
+      properties:
+        _id:
+          type: string
+        code:
+          type: string
+          example: "1000"
+        name:
+          type: string
+          example: "Cash"
+        type:
+          type: string
+          enum: [asset, liability, equity, revenue, expense]
+        normalBalance:
+          type: string
+          enum: [debit, credit]
+        isActive:
+          type: boolean
+
+    JournalLine:
+      type: object
+      properties:
+        accountCode:
+          type: string
+        description:
+          type: string
+        debit:
+          type: number
+        credit:
+          type: number
+
+    JournalEntry:
+      type: object
+      properties:
+        _id:
+          type: string
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalLine"
+
+    ImportJob:
+      type: object
+      properties:
+        _id:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        fileName:
+          type: string
+        rowCount:
+          type: integer
+
+paths:
+  /accounts:
+    get:
+      summary: List all active accounts
+      tags: [Accounts]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Account"
+    post:
+      summary: Create a new account
+      tags: [Accounts]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, type]
+              properties:
+                code:
+                  type: string
+                  example: "1100"
+                name:
+                  type: string
+                  example: "Accounts Receivable"
+                type:
+                  type: string
+                  enum: [asset, liability, equity, revenue, expense]
+                normalBalance:
+                  type: string
+                  enum: [debit, credit]
+      responses:
+        "201":
+          description: Account created
+        "400":
+          description: Missing required fields
+        "409":
+          description: Account code already exists
+
+  /accounts/{code}:
+    get:
+      summary: Get account by code
+      tags: [Accounts]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: code
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Account details
+        "404":
+          description: Account not found
+
+  /entries/search:
+    post:
+      summary: Search journal entries
+      tags: [Entries]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                q:
+                  type: string
+                  description: Search query
+                page:
+                  type: integer
+                  default: 1
+                pageSize:
+                  type: integer
+                  default: 50
+                  maximum: 100
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          description: Paginated search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/JournalEntry"
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+                  hasMore:
+                    type: boolean
+
+  /entries/{entryId}:
+    get:
+      summary: Get a single journal entry
+      tags: [Entries]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: entryId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entry with lines
+    put:
+      summary: Update a journal entry
+      tags: [Entries]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalEntry"
+      responses:
+        "200":
+          description: Entry updated
+    delete:
+      summary: Soft-delete a journal entry
+      tags: [Entries]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Entry moved to trash
+
+  /entries/reclassify:
+    post:
+      summary: Reclassify multiple entries
+      tags: [Entries]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entryIds:
+                  type: array
+                  items:
+                    type: string
+                fromAccount:
+                  type: string
+                toAccount:
+                  type: string
+      responses:
+        "200":
+          description: Entries reclassified
+
+  /reports/financial-statements:
+    get:
+      summary: Get P&L and Balance Sheet
+      tags: [Reports]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Financial statements
+
+  /reports/cash-flow:
+    get:
+      summary: Get cash flow statement
+      tags: [Reports]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Cash flow statement
+
+  /reports/trial-balance:
+    get:
+      summary: Get trial balance
+      tags: [Reports]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Trial balance with debit/credit totals
+
+  /reports/export-excel:
+    get:
+      summary: Export reports as Excel workbook
+      tags: [Reports]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: view
+          schema:
+            type: string
+            enum: [pl, bs, cf, tb, all]
+      responses:
+        "200":
+          description: Excel .xlsx file
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /reconcile:
+    get:
+      summary: Get reconciliation status
+      tags: [Reconciliation]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: accountCode
+          schema:
+            type: string
+        - in: query
+          name: periodStart
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: periodEnd
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Reconciliation data with matches
+
+  /reconcile/upload:
+    post:
+      summary: Upload bank statement (CSV/Excel)
+      tags: [Reconciliation]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                accountCode:
+                  type: string
+      responses:
+        "200":
+          description: Statement uploaded and matched
+
+  /reconcile/match:
+    post:
+      summary: Confirm a suggested match
+      tags: [Reconciliation]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statementLineId:
+                  type: string
+                entryId:
+                  type: string
+      responses:
+        "200":
+          description: Match confirmed
+
+  /reconcile/confirm:
+    post:
+      summary: Finalize reconciliation
+      tags: [Reconciliation]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accountCode:
+                  type: string
+                periodEnd:
+                  type: string
+                  format: date
+                endingBalance:
+                  type: number
+      responses:
+        "200":
+          description: Reconciliation finalized
+
+  /upload-import:
+    post:
+      summary: Upload CSV/Excel/PDF for import
+      tags: [Import]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: File uploaded and queued for processing
+
+  /process-import:
+    post:
+      summary: Process an import job
+      tags: [Import]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobId:
+                  type: string
+                mapping:
+                  type: object
+      responses:
+        "200":
+          description: Import processed
+
+  /import-jobs:
+    get:
+      summary: List import jobs
+      tags: [Import]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List of import jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ImportJob"
+
+  /import-jobs/{jobId}:
+    get:
+      summary: Get import job details
+      tags: [Import]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Import job with rows
+
+  /dashboard/summary:
+    get:
+      summary: Get dashboard summary metrics
+      tags: [Dashboard]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Revenue, expenses, net income, account balances
+
+  /dashboard/trends:
+    get:
+      summary: Get monthly trends
+      tags: [Dashboard]
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: months
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: Monthly revenue/expense trend data
+
+  /dashboard/activity:
+    get:
+      summary: Get recent activity feed
+      tags: [Dashboard]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Recent entries, imports, reconciliations
+
+  /ai/classify:
+    post:
+      summary: AI classify transaction rows
+      tags: [AI]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rows:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: Classified rows with account suggestions
+
+  /ai/detect-columns:
+    post:
+      summary: AI detect column mappings
+      tags: [AI]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                headers:
+                  type: array
+                  items:
+                    type: string
+                sampleRows:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: Detected column mapping
+
+  /team:
+    get:
+      summary: List team members
+      tags: [Team]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Team member list
+    post:
+      summary: Invite a team member
+      tags: [Team]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [admin, customer, viewer]
+      responses:
+        "200":
+          description: Invitation sent
+
+  /clients:
+    get:
+      summary: List clients
+      tags: [Clients]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Client list
+    post:
+      summary: Create a client
+      tags: [Clients]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+      responses:
+        "201":
+          description: Client created
+
+  /periods:
+    get:
+      summary: List all periods
+      tags: [Periods]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Period list with status
+    post:
+      summary: Create a new period
+      tags: [Periods]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                yearMonth:
+                  type: string
+                  example: "2024-01"
+      responses:
+        "201":
+          description: Period created
+
+  /schedules:
+    get:
+      summary: List report schedules
+      tags: [Schedules]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Schedule list
+    post:
+      summary: Create report schedule
+      tags: [Schedules]
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clientId:
+                  type: string
+                frequency:
+                  type: string
+                  enum: [weekly, monthly]
+                reportType:
+                  type: string
+      responses:
+        "201":
+          description: Schedule created
+
+  /subscription:
+    get:
+      summary: Get current subscription
+      tags: [Billing]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Subscription details with features
+
+  /auth/signup:
+    post:
+      summary: Create a new account
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                companyName:
+                  type: string
+      responses:
+        "200":
+          description: Account created
+        "409":
+          description: Email already registered
+
+  /health/db:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        "200":
+          description: Database connection status

@@ -296,7 +296,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
             <h3 className="text-sm font-semibold text-surface-900 mb-4">
               {editingCode ? `Edit Account: ${editingCode}` : 'Create New Account'}
             </h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <Input label="Code" placeholder="e.g. 1000" value={formCode} onChange={(e) => setFormCode(e.target.value)} disabled={!!editingCode} />
               <Input label="Name" placeholder="e.g. Cash" value={formName} onChange={(e) => setFormName(e.target.value)} />
               <div className="space-y-1.5">

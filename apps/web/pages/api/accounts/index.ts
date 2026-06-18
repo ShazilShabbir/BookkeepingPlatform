@@ -4,8 +4,9 @@ import Account from '@/lib/models/Account';
 import { logAction } from '@/lib/audit';
 import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { withRateLimit } from '@/lib/apiRateLimit';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'POST' && !checkCsrf(req, res)) return;
 
@@ -58,3 +59,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: msg });
   }
 }
+
+export default withRateLimit(handler);

@@ -16,8 +16,8 @@ interface TabsProps {
 
 export function Tabs({ tabs, activeTab, onChange, className }: TabsProps) {
   return (
-    <div className="overflow-x-auto scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
-      <div className={clsx('flex space-x-1 border-b border-surface-200 min-w-max', className)}>
+    <div className="overflow-x-auto sm:overflow-visible scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
+      <div className={clsx('flex sm:flex-wrap gap-1 border-b border-surface-200 min-w-max sm:min-w-0', className)}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
