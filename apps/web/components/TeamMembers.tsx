@@ -142,10 +142,10 @@ export default function TeamMembers() {
             <thead>
               <tr className="border-b border-surface-200">
                 <th className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600">Email</th>
+                <th className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Email</th>
                 <th className="text-left py-2 pr-4 font-medium text-surface-600">Role</th>
                 <th className="text-left py-2 pr-4 font-medium text-surface-600">Status</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600">Invited</th>
+                <th className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Invited</th>
                 <th className="text-left py-2 font-medium text-surface-600"></th>
               </tr>
             </thead>
@@ -153,7 +153,7 @@ export default function TeamMembers() {
               {members.map(m => (
                 <tr key={m.id} className="border-b border-surface-100">
                   <td className="py-2 pr-4">{m.name || '—'}</td>
-                  <td className="py-2 pr-4">{m.email}</td>
+                  <td className="py-2 pr-4 hidden sm:table-cell">{m.email}</td>
                   <td className="py-2 pr-4">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${m.role === 'editor' ? 'bg-indigo-100 text-indigo-700' : 'bg-surface-100 text-surface-600'}`}>
                       {m.role}
@@ -164,7 +164,7 @@ export default function TeamMembers() {
                       {m.status}
                     </span>
                   </td>
-                  <td className="py-2 pr-4 text-xs text-surface-400">{m.invitedAt ? new Date(m.invitedAt).toLocaleDateString() : '—'}</td>
+                  <td className="py-2 pr-4 text-xs text-surface-400 hidden md:table-cell">{m.invitedAt ? new Date(m.invitedAt).toLocaleDateString() : '—'}</td>
                   <td className="py-2">
                     <button onClick={() => remove(m.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
                   </td>

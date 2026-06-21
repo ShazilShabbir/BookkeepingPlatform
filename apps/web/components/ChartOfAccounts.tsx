@@ -52,6 +52,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
   const [formBalance, setFormBalance] = useState<Account['normalBalance']>('debit');
   const [formCurrency, setFormCurrency] = useState('USD');
   const [formParent, setFormParent] = useState('');
+  const [showCsvTooltip, setShowCsvTooltip] = useState(false);
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -222,12 +223,12 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0 ml-4">
-            <button onClick={() => startEdit(account)} className="p-1.5 text-surface-400 hover:text-primary-600 transition-colors" title="Edit">
+            <button onClick={() => startEdit(account)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-primary-600 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center" title="Edit">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </button>
-            <button onClick={() => deactivateAccount(account)} className="p-1.5 text-surface-400 hover:text-red-500 transition-colors" title="Deactivate">
+            <button onClick={() => deactivateAccount(account)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center" title="Deactivate">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
@@ -273,20 +274,24 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
               </svg>
               Export CSV
             </Button>
-            <div className="relative group">
+            <div className="relative">
               <Button onClick={() => fileRef.current?.click()} loading={importing} variant="secondary">
                 <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
                 </svg>
                 Import CSV
               </Button>
-              <div className="absolute top-full mt-1.5 right-0 z-10 hidden group-hover:block w-64 p-3 bg-white rounded-lg shadow-lg border border-surface-200 text-xs text-surface-600">
-                <p className="font-medium text-surface-800 mb-1">CSV format:</p>
-                <code className="block text-[11px] bg-surface-50 p-1.5 rounded border border-surface-200 break-all">
-                  code,name,type,normalbalance,parentcode
-                </code>
-                <p className="mt-1">Download Export CSV as a template.</p>
-              </div>
+              <button onClick={() => setShowCsvTooltip(!showCsvTooltip)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-surface-200 text-surface-500 text-xs flex items-center justify-center hover:bg-surface-300" type="button" title="CSV format help">?</button>
+              {showCsvTooltip && (
+                <div className="absolute top-full mt-1.5 right-0 z-10 w-64 p-3 bg-white rounded-lg shadow-lg border border-surface-200 text-xs text-surface-600">
+                  <p className="font-medium text-surface-800 mb-1">CSV format:</p>
+                  <code className="block text-[11px] bg-surface-50 p-1.5 rounded border border-surface-200 break-all">
+                    code,name,type,normalbalance,parentcode
+                  </code>
+                  <p className="mt-1">Download Export CSV as a template.</p>
+                  <button onClick={() => setShowCsvTooltip(false)} className="mt-2 text-xs text-primary-600 hover:underline">Close</button>
+                </div>
+              )}
             </div>
             <input ref={fileRef} type="file" accept=".csv" onChange={handleImport} className="hidden" />
             <Button onClick={() => { resetForm(); setShowForm(true); }}>

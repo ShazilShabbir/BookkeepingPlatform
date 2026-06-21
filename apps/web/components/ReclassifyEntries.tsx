@@ -213,7 +213,7 @@ export default function ReclassifyEntries({ userId }: { userId: string }) {
                           </div>
                           <div className="relative shrink-0 ml-3">
                             {isActive ? (
-                              <div ref={pickRef} className="absolute right-0 top-0 z-20 w-72 bg-white rounded-xl border border-surface-200 shadow-elevated p-3 animate-scale-in">
+                              <div ref={pickRef} className="absolute left-0 sm:right-0 top-0 z-20 w-[90vw] max-w-72 sm:w-72 bg-white rounded-xl border border-surface-200 shadow-elevated p-3 animate-scale-in">
                                 <Input
                                   placeholder="Search accounts..."
                                   value={pickSearch}

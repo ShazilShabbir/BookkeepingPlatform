@@ -160,7 +160,7 @@ export default function ScheduleManager({ userId }: { userId: string }) {
                 </div>
                 <button
                   onClick={() => deleteSchedule(schedule._id)}
-                  className="p-1.5 text-surface-400 hover:text-red-500 transition-colors shrink-0 ml-4"
+                  className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors shrink-0 ml-4 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                   title="Delete schedule"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

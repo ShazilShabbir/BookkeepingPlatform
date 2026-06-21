@@ -25,7 +25,7 @@ export default function UserMenu() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-100 transition-colors"
+        className="flex items-center gap-2 p-2.5 sm:p-1.5 rounded-lg hover:bg-surface-100 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0"
         aria-label="User menu"
       >
         <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">
@@ -36,7 +36,7 @@ export default function UserMenu() {
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-modal border border-surface-200 overflow-hidden z-50 animate-scale-in origin-top-right">
+        <div className="absolute right-0 mt-2 w-[90vw] max-w-56 sm:w-56 bg-white rounded-xl shadow-modal border border-surface-200 overflow-hidden z-50 animate-scale-in origin-top-right">
           <div className="px-4 py-3 border-b border-surface-100">
             <p className="text-sm font-medium text-surface-900 truncate">{user?.name || 'User'}</p>
             <p className="text-xs text-surface-400 truncate">{user?.email}</p>

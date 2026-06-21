@@ -141,7 +141,7 @@ export default function ManageCustomers() {
                   </Button>
                   <button
                     onClick={() => deleteCustomer(customer)}
-                    className="p-1.5 text-surface-400 hover:text-red-500 transition-colors"
+                    className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                     title="Delete"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -370,7 +370,7 @@ export default function Reconcile({ userId }: { userId: string }) {
           </div>
         )}
 
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 mb-2 flex-wrap">
           {grouped.map(g => (
             <button key={g.status} onClick={() => {
               const el = document.getElementById(`group-${g.status}`);

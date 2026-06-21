@@ -169,7 +169,7 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
             <Button size="lg" onClick={() => window.location.href = '/dashboard?tab=import'}>Import Data</Button>
             <Button size="lg" variant="secondary" onClick={() => window.location.href = '/dashboard?tab=transactions'}>Add Entry</Button>
           </div>
-          <div className="mt-8 grid grid-cols-3 gap-4 text-left">
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
             {[
               { step: '1', title: 'Import Data', desc: 'Upload CSV or Excel files' },
               { step: '2', title: 'Review & Classify', desc: 'Categorize your transactions' },

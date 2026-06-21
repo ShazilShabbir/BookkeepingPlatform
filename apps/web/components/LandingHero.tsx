@@ -89,7 +89,7 @@ export default function LandingHero() {
                 </div>
 
                 {/* Summary row */}
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                   {[
                     { label: 'Revenue', value: '$48.2k', change: '+12.5%', color: 'text-emerald-400' },
                     { label: 'Expenses', value: '$36.1k', change: '+3.2%', color: 'text-red-400' },

@@ -208,7 +208,7 @@ export default function SupportTickets({ userId }: { userId: string }) {
                   {tickets.map((t) => (
                     <tr key={t._id} className={`border-b border-surface-100 hover:bg-surface-50 transition-colors cursor-pointer ${isUnread(t) ? 'bg-primary-50/40' : ''}`} onClick={() => { setSelected(t); markRead(t._id, t.updatedAt); }}>
                       <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
                           {isUnread(t) && <span className="w-2 h-2 rounded-full bg-primary-500 shrink-0" />}
                           <span className={`font-medium ${isUnread(t) ? 'text-surface-900' : 'text-primary-600 hover:text-primary-700'}`}>{t.subject}</span>
                         </div>
@@ -289,7 +289,7 @@ export default function SupportTickets({ userId }: { userId: string }) {
           <div className="relative bg-white rounded-2xl shadow-modal border border-surface-200 w-full max-w-lg max-h-[85vh] overflow-y-auto mx-4">
             <div className="sticky top-0 bg-white border-b border-surface-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
               <h3 className="text-lg font-semibold text-surface-900">New Support Ticket</h3>
-              <button onClick={() => setShowForm(false)} className="p-1.5 text-surface-400 hover:text-surface-600 rounded-lg hover:bg-surface-100">
+              <button onClick={() => setShowForm(false)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-surface-600 rounded-lg hover:bg-surface-100 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>

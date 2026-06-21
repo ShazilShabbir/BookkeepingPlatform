@@ -24,7 +24,7 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-2 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors"
+        className="relative p-2.5 sm:p-2 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
         aria-label="Notifications"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -37,7 +37,7 @@ export default function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-modal border border-surface-200 overflow-hidden z-50 animate-scale-in origin-top-right">
+        <div className="absolute right-0 mt-2 w-[90vw] max-w-72 sm:w-72 bg-white rounded-xl shadow-modal border border-surface-200 overflow-hidden z-50 animate-scale-in origin-top-right">
           <div className="px-4 py-3 border-b border-surface-100">
             <p className="text-sm font-semibold text-surface-900">Notifications</p>
           </div>

@@ -19,7 +19,7 @@ const variantStyles: Record<Variant, string> = {
 };
 
 const sizeStyles: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm gap-1.5 min-h-9',
+  sm: 'px-3 py-1.5 text-sm gap-1.5 min-h-10',
   md: 'px-4 py-2 text-sm gap-2 min-h-10',
   lg: 'px-6 py-3 text-base gap-2 min-h-11',
 };

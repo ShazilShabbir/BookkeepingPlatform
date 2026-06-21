@@ -170,7 +170,7 @@ export default function CustomerFieldConfig({ customerUid, customerName, onClose
             <h2 className="text-lg font-semibold text-surface-900">Field Configuration</h2>
             <p className="text-sm text-surface-500">Configure CSV mapping for <strong>{customerName}</strong></p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-surface-400 hover:text-surface-600 transition-colors">
+          <button onClick={onClose} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-surface-600 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -315,7 +315,7 @@ export default function CustomerFieldConfig({ customerUid, customerName, onClose
                   </label>
                   <button
                     onClick={() => removeField(field.id)}
-                    className="p-1.5 text-surface-400 hover:text-red-500 transition-colors ml-auto"
+                    className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors ml-auto min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
                     title="Remove"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
