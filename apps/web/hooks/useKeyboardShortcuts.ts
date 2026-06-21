@@ -1,1 +1,1 @@
-export { useKeyboardShortcuts, useShortcutGuide } from './useKeyboardShortcuts.tsx';
+// Keyboard shortcuts removed — was confusing for customers

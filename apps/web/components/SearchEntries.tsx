@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/format';
 
 interface AccountOption {
   code: string;
@@ -236,8 +237,8 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
     }
   };
 
-  const formatAmount = (val: number) => {
-    const abs = Math.abs(val).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const formatAmount = (val: number, currency = 'USD') => {
+    const abs = formatCurrency(Math.abs(val), currency);
     return val < 0 ? `-${abs}` : abs;
   };
 

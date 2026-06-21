@@ -11,13 +11,13 @@ const features = [
     ),
   },
   {
-    title: 'Multi-Format Import',
-    description: 'Import sales data from CSV, Excel, or PDF files with automatic categorization, validation, and error detection.',
-    highlight: 'CSV, Excel, PDF',
+    title: 'Invoicing & Payments',
+    description: 'Create professional invoices, send via email, and accept card payments through Stripe payment links. Get paid faster.',
+    highlight: 'Send, track, collect',
     gradient: 'from-emerald-500 to-emerald-600',
     icon: (
       <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

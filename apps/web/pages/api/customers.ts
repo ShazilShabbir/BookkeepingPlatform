@@ -5,6 +5,7 @@ import User from '@/lib/models/User';
 import { logAction } from '@/lib/audit';
 import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
 import { csvMappingSchema, customFieldsArraySchema, safeParse } from '@/lib/validate';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -48,6 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
+      const { allowed } = await checkFeatureAccess(uid, 'customer-management');
+      if (!allowed) return res.status(403).json({ error: 'Customer management requires Pro plan or higher. Visit /pricing to upgrade.', code: 'UPGRADE_REQUIRED' });
+
       if (!requireRole(token, 'admin')) {
         return res.status(403).json({ error: 'Only admins can create customers' });
       }

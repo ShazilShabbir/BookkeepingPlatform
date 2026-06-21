@@ -21,6 +21,9 @@ export interface IUser extends Document {
   totpSecret?: string;
   totpEnabled?: boolean;
   totpBackupCodes?: string[];
+  brandingLogo?: string;
+  brandingPrimaryColor?: string;
+  brandingCompanyName?: string;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -43,6 +46,9 @@ const UserSchema = new Schema<IUser>({
   totpSecret: { type: String, default: undefined },
   totpEnabled: { type: Boolean, default: false },
   totpBackupCodes: { type: [String], default: undefined },
+  brandingLogo: { type: String, default: '' },
+  brandingPrimaryColor: { type: String, default: '#6366f1' },
+  brandingCompanyName: { type: String, default: '' },
 });
 
 UserSchema.pre('save', function (next) {

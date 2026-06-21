@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = token.sub!;
 
-  const { allowed } = await checkFeatureAccess(uid!, 'customer-management');
+  const { allowed } = await checkFeatureAccess(uid!, 'bank-reconciliation');
   if (!allowed) return res.status(403).json({ error: 'Reconciliation requires Pro plan or higher. Visit /pricing to upgrade.', code: 'UPGRADE_REQUIRED' });
 
   await dbConnect();

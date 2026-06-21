@@ -3,6 +3,8 @@ import { getToken } from 'next-auth/jwt';
 import { generateWorkbook } from '@/lib/excel';
 import { checkFeatureAccess } from '@/lib/subscription';
 import { resolveUserId } from '@/lib/customerContext';
+import dbConnect from '@/lib/mongoose';
+import User from '@/lib/models/User';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -18,7 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { startDate, endDate } = req.body;
-    const workbook = await generateWorkbook(uid, startDate, endDate);
+    await dbConnect();
+    const user = await User.findById(uid).select('brandingPrimaryColor brandingCompanyName').lean();
+    const branding = user ? { primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName } : undefined;
+    const workbook = await generateWorkbook(uid, startDate, endDate, branding);
     const buffer = await workbook.xlsx.writeBuffer();
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

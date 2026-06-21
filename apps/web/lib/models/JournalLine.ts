@@ -7,6 +7,7 @@ export interface IJournalLine extends Document {
   description?: string;
   debit: number;
   credit: number;
+  exchangeRate?: number;
   rawData?: Record<string, any>;
 }
 
@@ -17,6 +18,7 @@ const JournalLineSchema = new Schema<IJournalLine>({
   description: { type: String, default: '' },
   debit: { type: Number, default: 0 },
   credit: { type: Number, default: 0 },
+  exchangeRate: { type: Number, default: null },
   rawData: { type: Schema.Types.Mixed, default: null },
 });
 

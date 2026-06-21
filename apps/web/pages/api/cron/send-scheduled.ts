@@ -38,13 +38,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const user = await User.findById((schedule as any).userId).lean();
         if (!user) continue;
         const ownerName = (user as any)?.name || 'Business Owner';
+        const branding = { logo: (user as any).brandingLogo, primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName };
 
         const client = await Client.findOne({ _id: (schedule as any).clientId }).lean();
         const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
 
         const statements = await getFinancialStatements((schedule as any).userId);
-        const html = generateReportHTML(statements, ownerName, shareLink);
-        const workbook = await generateWorkbook((schedule as any).userId);
+        const html = generateReportHTML(statements, ownerName, shareLink, branding);
+        const workbook = await generateWorkbook((schedule as any).userId, undefined, undefined, branding);
         const buffer = await workbook.xlsx.writeBuffer();
         const base64 = (buffer as any).toString('base64');
 

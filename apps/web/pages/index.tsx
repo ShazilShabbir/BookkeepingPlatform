@@ -32,7 +32,7 @@ export default function Home() {
     <>
       <Head>
         <title>BookKeep — Sales Analytics Made Simple</title>
-        <meta name="description" content="Track revenue, expenses, and profit margins in real time. Import CSV data, reconcile bank statements, and generate professional financial reports." />
+        <meta name="description" content="Track revenue, expenses, and profit margins in real time. Import CSV/Excel/PDF, create invoices, sync bank feeds via Plaid, and generate financial reports." />
         <meta name="keywords" content="bookkeeping, sales analytics, financial reports, CSV import, bank reconciliation, small business accounting" />
         <link rel="canonical" href={siteUrl} />
         <meta property="og:type" content="website" />
@@ -83,6 +83,4 @@ export default function Home() {
   );
 }
 
-export function getServerSideProps() {
-  return { props: {} };
-}
+

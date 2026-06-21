@@ -1,5 +1,5 @@
 export type Tier = 'free' | 'pro' | 'business';
-export type Feature = 'ai-classify' | 'excel-export' | 'share-links' | 'email-reports' | 'cash-flow' | 'trial-balance' | 'period-close' | 'customer-management' | 'multi-user' | 'custom-branding' | 'priority-support';
+export type Feature = 'ai-classify' | 'excel-export' | 'share-links' | 'email-reports' | 'cash-flow' | 'trial-balance' | 'period-close' | 'customer-management' | 'multi-user' | 'custom-branding' | 'priority-support' | 'invoicing' | 'bank-reconciliation' | 'multi-currency';
 
 export interface TierConfig {
   label: string;
@@ -33,12 +33,15 @@ export const TIERS: Record<Tier, TierConfig> = {
       'multi-user': false,
       'custom-branding': false,
       'priority-support': false,
+      'invoicing': false,
+      'bank-reconciliation': false,
+      'multi-currency': false,
     },
   },
   pro: {
     label: 'Pro',
-    priceMonthly: 10,
-    priceYearly: 100,
+    priceMonthly: 5,
+    priceYearly: 57,
     stripePriceIdMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_MONTHLY || '',
     stripePriceIdYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_YEARLY || '',
     entryLimit: 1000,
@@ -55,12 +58,15 @@ export const TIERS: Record<Tier, TierConfig> = {
       'multi-user': false,
       'custom-branding': false,
       'priority-support': false,
+      'invoicing': true,
+      'bank-reconciliation': true,
+      'multi-currency': true,
     },
   },
   business: {
     label: 'Business',
-    priceMonthly: 25,
-    priceYearly: 250,
+    priceMonthly: 10,
+    priceYearly: 114,
     stripePriceIdMonthly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_BUSINESS_MONTHLY || '',
     stripePriceIdYearly: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_BUSINESS_YEARLY || '',
     entryLimit: -1, // unlimited
@@ -77,6 +83,9 @@ export const TIERS: Record<Tier, TierConfig> = {
       'multi-user': true,
       'custom-branding': true,
       'priority-support': true,
+      'invoicing': true,
+      'bank-reconciliation': true,
+      'multi-currency': true,
     },
   },
 };
@@ -93,6 +102,9 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   'multi-user': 'Multi-User Access',
   'custom-branding': 'Custom Branding',
   'priority-support': 'Priority Support',
+  'invoicing': 'Invoice Creation',
+  'bank-reconciliation': 'Bank Reconciliation',
+  'multi-currency': 'Multi-Currency Support',
 };
 
 export function getTier(tier: string): TierConfig {

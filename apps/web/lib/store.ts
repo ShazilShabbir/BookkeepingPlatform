@@ -36,3 +36,15 @@ export const useCustomerStore = create<CustomerContextStore>((set) => ({
   customerName: null,
   setCustomer: (uid, name) => set({ customerUid: uid, customerName: name ?? null }),
 }));
+
+interface NotificationStore {
+  unreadCount: number;
+  setUnreadCount: (count: number) => void;
+  incrementUnread: () => void;
+}
+
+export const useNotificationStore = create<NotificationStore>((set) => ({
+  unreadCount: 0,
+  setUnreadCount: (count) => set({ unreadCount: count }),
+  incrementUnread: () => set((s) => ({ unreadCount: s.unreadCount + 1 })),
+}));

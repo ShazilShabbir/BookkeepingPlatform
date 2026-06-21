@@ -35,7 +35,7 @@ export default function LandingHero() {
               </span>
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-surface-400 leading-relaxed max-w-lg">
-              Import CSV, Excel, and PDF data. Reconcile transactions. Generate powerful reports in minutes. No accounting degree required.
+              Import CSV, Excel, and PDF data. Create invoices and collect payments. Reconcile transactions and generate reports. No accounting degree required.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-4">
@@ -53,8 +53,8 @@ export default function LandingHero() {
 
             <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3">
               {[
+                { label: 'Stripe-powered', sub: 'invoicing & payments' },
                 { label: 'Bank-grade', sub: 'encryption' },
-                { label: 'SOC 2', sub: 'compliant' },
                 { label: 'Multi-user', sub: 'access' },
               ].map((item) => (
                 <div key={item.label} className="flex items-center gap-2.5">

@@ -15,23 +15,29 @@ import ScheduleManager from '@/components/ScheduleManager';
 import ClientManager from '@/components/ClientManager';
 import TrashPanel from '@/components/TrashPanel';
 import TeamMembers from '@/components/TeamMembers';
+import InvoiceList from '@/components/InvoiceList';
+import SupportTickets from '@/components/SupportTickets';
+
 import { Tabs } from '@/components/ui';
 import Head from 'next/head';
-import { useKeyboardShortcuts, useShortcutGuide } from '@/hooks/useKeyboardShortcuts';
+import DashboardHeader from '@/components/DashboardHeader';
+import GroupedTabs, { ALL_TAB_IDS } from '@/components/GroupedTabs';
 
-const tabItems = [
+const mobileTabItems = [
   { id: 'dashboard', label: 'Dashboard' },
-  { id: 'accounts', label: 'Chart of Accounts' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'invoices', label: 'Invoices' },
   { id: 'reclassify', label: 'Reclassify' },
   { id: 'import', label: 'Import' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'customers', label: 'Customers' },
-  { id: 'reconciliation', label: 'Reconciliation' },
+  { id: 'reconciliation', label: 'Reconcile' },
   { id: 'period-close', label: 'Period Close' },
   { id: 'reports', label: 'Reports' },
   { id: 'schedules', label: 'Schedules' },
   { id: 'team', label: 'Team' },
   { id: 'clients', label: 'Clients' },
+  { id: 'support', label: 'Support' },
   { id: 'trash', label: 'Trash' },
 ];
 
@@ -44,27 +50,15 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const effectiveUserId = useMemo(() => customerUid || user?.id || '', [customerUid, user?.id]);
-  const { open: guideOpen, setOpen: setGuideOpen, guide } = useShortcutGuide();
 
-  const handleKeyShortcut = useCallback((searchInputRef?: React.RefObject<HTMLInputElement | null>) => {
-    return {
-      '/': () => {
-        const input = document.querySelector<HTMLInputElement>('input[type="search"], input[placeholder*="Search"]');
-        input?.focus();
-      },
-      n: () => setActiveTab('import'),
-      d: () => setActiveTab('dashboard'),
-      t: () => setActiveTab('transactions'),
-      '?': () => setGuideOpen(true),
-      Escape: () => setGuideOpen(false),
-    };
-  }, [setGuideOpen]);
-
-  useKeyboardShortcuts(handleKeyShortcut());
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+    router.push({ query: { ...router.query, tab } }, undefined, { shallow: true });
+  }, [router]);
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ['accounts', 'reclassify', 'import', 'transactions', 'customers', 'reconciliation', 'period-close', 'reports', 'schedules', 'team', 'clients', 'trash'].includes(tab)) {
+    if (tab && ALL_TAB_IDS.includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
@@ -97,18 +91,19 @@ export default function Dashboard() {
         <title>Dashboard | BookKeep</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <div className="py-4 sm:py-8 animate-fade-in overflow-x-hidden">
+      <div className="py-4 sm:py-6 animate-fade-in overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-surface-900">Dashboard</h1>
-            <p className="mt-1 text-surface-500">
-              {customerUid ? `Viewing ${customerName}'s data` : `Welcome back, ${user.name || user.email}`}
-            </p>
-          </div>
-        </div>
+        <DashboardHeader
+          title="Dashboard"
+          subtitle={customerUid ? `Viewing ${customerName}'s data` : `Welcome back, ${user.name || user.email}`}
+        />
 
-        <Tabs tabs={tabItems} activeTab={activeTab} onChange={setActiveTab} className="mb-8" />
+        <div className="hidden sm:block mb-6">
+          <GroupedTabs activeTab={activeTab} onChange={handleTabChange} />
+        </div>
+        <div className="sm:hidden mb-6">
+          <Tabs tabs={mobileTabItems} activeTab={activeTab} onChange={handleTabChange} />
+        </div>
 
         {activeTab === 'dashboard' && (
           <div className="animate-fade-in" key={effectiveUserId}>
@@ -136,6 +131,12 @@ export default function Dashboard() {
               </div>
             )}
             <ImportCSV userId={effectiveUserId} customerUid={customerUid || undefined} />
+          </div>
+        )}
+
+        {activeTab === 'invoices' && (
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <InvoiceList userId={effectiveUserId} />
           </div>
         )}
 
@@ -186,6 +187,12 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === 'support' && (
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <SupportTickets userId={effectiveUserId} />
+          </div>
+        )}
+
         {activeTab === 'trash' && (
           <div className="animate-fade-in" key={effectiveUserId}>
             <TrashPanel userId={effectiveUserId} />
@@ -202,7 +209,6 @@ export default function Dashboard() {
             <Reconcile userId={effectiveUserId} />
           </div>
         )}
-        {guide}
       </div>
     </div>
     </>

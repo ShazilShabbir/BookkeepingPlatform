@@ -5,6 +5,7 @@ import { logAction } from '@/lib/audit';
 import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
 import { withRateLimit } from '@/lib/apiRateLimit';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -25,8 +26,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!requireRole(token, 'admin')) {
         return res.status(403).json({ error: 'Only admins can create accounts' });
       }
-      const { code, name, type, normalBalance } = req.body;
+      const { code, name, type, normalBalance, currency } = req.body;
       if (!code || !name || !type) return res.status(400).json({ error: 'code, name, and type are required' });
+
+      const accountCurrency = (currency || 'USD').toUpperCase();
+      if (accountCurrency !== 'USD') {
+        const { allowed } = await checkFeatureAccess(uid, 'multi-currency');
+        if (!allowed) return res.status(403).json({ error: 'Multi-currency requires Pro plan or higher.', code: 'UPGRADE_REQUIRED' });
+      }
 
       const existing = await Account.findOne({ userId: uid, code });
       if (existing) return res.status(409).json({ error: 'Account code already exists' });
@@ -40,6 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         name,
         type: normalizedType,
         normalBalance: normalizedBalance,
+        currency: accountCurrency,
         isActive: true,
       });
       await logAction({ userId: uid, action: 'create', resource: 'account', resourceId: code, details: { name, type: normalizedType }, req });

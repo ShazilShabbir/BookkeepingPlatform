@@ -23,6 +23,7 @@
     "next-auth": "^4.24.14",
     "papaparse": "^5.4.1",
     "pdf-parse": "^2.4.5",
+    "pdfmake": "^0.2.23",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.0",

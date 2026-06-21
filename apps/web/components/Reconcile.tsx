@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { formatCurrency } from '@/lib/format';
 
 type Step = 'setup' | 'review' | 'summary' | 'completed';
 
@@ -19,7 +20,7 @@ interface LineItem {
 
 interface AccountOption { code: string; name: string; }
 
-function fmt(n: number) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
+function fmt(n: number, currency = 'USD') { return formatCurrency(n, currency); }
 
 export default function Reconcile({ userId }: { userId: string }) {
   const [step, setStep] = useState<Step>('setup');

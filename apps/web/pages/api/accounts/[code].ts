@@ -4,6 +4,7 @@ import Account from '@/lib/models/Account';
 import { logAction } from '@/lib/audit';
 import { requireAuth, requireRole, checkCsrf } from '@/lib/auth';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { checkFeatureAccess } from '@/lib/subscription';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -28,12 +29,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!requireRole(token, 'admin')) {
         return res.status(403).json({ error: 'Only admins can update accounts' });
       }
-      const { name, type, normalBalance, isActive } = req.body;
+      const { name, type, normalBalance, isActive, currency } = req.body;
       const update: Record<string, any> = { updatedAt: new Date() };
       if (name !== undefined) update.name = name;
       if (type !== undefined) update.type = type.toLowerCase();
       if (normalBalance !== undefined) update.normalBalance = normalBalance.toLowerCase();
       if (isActive !== undefined) update.isActive = isActive;
+      if (currency !== undefined) {
+        const ccy = currency.toUpperCase();
+        if (ccy !== 'USD') {
+          const { allowed } = await checkFeatureAccess(uid, 'multi-currency');
+          if (!allowed) return res.status(403).json({ error: 'Multi-currency requires Pro plan or higher.', code: 'UPGRADE_REQUIRED' });
+        }
+        update.currency = ccy;
+      }
 
       const account = await Account.findOneAndUpdate(
         { userId: uid, code },

@@ -8,15 +8,16 @@ import { hasFeature, getTier } from '@/lib/tiers';
 import crypto from 'crypto';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (!checkCsrf(req, res)) return;
+  try {
+    if (!checkCsrf(req, res)) return;
 
-  const token = await requireAuth(req, res);
-  if (!token) return;
-  const uid = token.sub!;
+    const token = await requireAuth(req, res);
+    if (!token) return;
+    const uid = token.sub!;
 
-  await dbConnect();
+    await dbConnect();
 
-  if (req.method === 'GET') {
+    if (req.method === 'GET') {
     const members = await TeamMember.find({ adminId: uid }).sort({ invitedAt: -1 }).lean();
     return res.status(200).json({
       success: true,
@@ -128,4 +129,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
+  } catch (e: any) {
+    console.error('team error:', e?.message || e);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 }

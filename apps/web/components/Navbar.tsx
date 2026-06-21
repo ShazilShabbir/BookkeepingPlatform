@@ -8,6 +8,7 @@ import clsx from 'clsx';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard?tab=invoices', label: 'Invoices' },
   { href: '/billing', label: 'Billing' },
 ];
 

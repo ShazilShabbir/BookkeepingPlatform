@@ -25,13 +25,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const user = await User.findById(uid).lean();
     const ownerName = (user as any)?.name || 'Business Owner';
+    const branding = { logo: (user as any).brandingLogo, primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName };
 
     const client = await Client.findOne({ _id: clientId, userId: uid }).lean();
     const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
 
     const statements = await getFinancialStatements(uid, startDate, endDate);
-    const html = generateReportHTML(statements, ownerName, shareLink);
-    const workbook = await generateWorkbook(uid, startDate, endDate);
+    const html = generateReportHTML(statements, ownerName, shareLink, branding);
+    const workbook = await generateWorkbook(uid, startDate, endDate, branding);
     const buffer = await workbook.xlsx.writeBuffer();
 
     const { Resend } = await import('resend');

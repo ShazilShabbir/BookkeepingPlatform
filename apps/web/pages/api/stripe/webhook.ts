@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
+import Invoice from '@/lib/models/Invoice';
 import { stripe } from '@/lib/stripe';
 
 export const config = { api: { bodyParser: false } };
@@ -31,6 +32,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as any;
+
+        // Invoice payment (no subscription)
+        const invoiceId = session.metadata?.invoiceId;
+        if (invoiceId) {
+          await Invoice.findByIdAndUpdate(invoiceId, {
+            status: 'paid',
+            amountPaid: (session.amount_total || 0) / 100,
+            paidAt: new Date(),
+            stripePaymentIntentId: session.payment_intent,
+            stripePaymentLink: session.url || '',
+          });
+          break;
+        }
+
+        // Subscription checkout
         const uid = session.metadata?.userId;
         const tier = session.metadata?.tier || 'pro';
         if (uid) {
@@ -89,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         break;
       }
+
     }
 
     return res.status(200).json({ received: true });

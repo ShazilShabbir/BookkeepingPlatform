@@ -40,7 +40,7 @@ export async function requireFeature(uid: string, feature: Feature): Promise<voi
   const { allowed, tier } = await checkFeatureAccess(uid, feature);
   if (!allowed) {
     const config = getTier(tier);
-    const neededTier = feature === 'ai-classify' || feature === 'excel-export' || feature === 'share-links' || feature === 'email-reports' || feature === 'cash-flow' || feature === 'trial-balance' || feature === 'period-close' || feature === 'customer-management' ? 'Pro' : 'Business';
+    const neededTier = feature === 'ai-classify' || feature === 'excel-export' || feature === 'share-links' || feature === 'email-reports' || feature === 'cash-flow' || feature === 'trial-balance' || feature === 'period-close' || feature === 'customer-management' || feature === 'invoicing' || feature === 'bank-reconciliation' || feature === 'multi-currency' ? 'Pro' : 'Business';
     const err: any = new Error(`This feature requires ${neededTier} plan or higher.`);
     err.statusCode = 403;
     err.code = 'FEATURE_NOT_ALLOWED';

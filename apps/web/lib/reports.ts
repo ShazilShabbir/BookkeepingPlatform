@@ -3,6 +3,12 @@ import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
 
+export interface BrandingOptions {
+  logo?: string;
+  primaryColor?: string;
+  companyName?: string;
+}
+
 export interface AccountBalanceDetail {
   accountCode: string;
   accountName: string;
@@ -141,6 +147,7 @@ export function generateReportHTML(
   statements: FinancialStatements,
   ownerName: string,
   shareLink?: string,
+  branding?: BrandingOptions,
 ): string {
   const { profitLoss, balanceSheet, dateRange } = statements;
   const netIncome = profitLoss.netIncome;
@@ -190,17 +197,24 @@ export function generateReportHTML(
 
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
+  const pc = branding?.primaryColor || '#6366f1';
+  const pcLighter = pc + '33';
+  const pcLightest = pc + '1a';
+
   const safeOwnerName = esc(ownerName);
   const safeShareLink = shareLink ? esc(shareLink) : '';
+  const brandCompanyName = esc(branding?.companyName || 'Bookkeeping Platform');
+  const logoHtml = branding?.logo ? `<img src="${esc(branding.logo)}" alt="Logo" style="max-height:40px;max-width:200px;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto" />` : '';
 
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;margin:0;padding:0">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-    <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px;text-align:center">
+    <tr><td style="background:${pc};padding:32px;text-align:center">
+      ${logoHtml}
       <h1 style="color:#fff;margin:0;font-size:24px">Financial Report</h1>
-      <p style="color:#c7d2fe;margin:8px 0 0;font-size:14px">${safeOwnerName} &middot; ${dateLabel}</p>
+      <p style="color:rgba(255,255,255,0.7);margin:8px 0 0;font-size:14px">${safeOwnerName} &middot; ${dateLabel}</p>
     </td></tr>
 
     <tr><td style="padding:24px">
@@ -223,9 +237,9 @@ export function generateReportHTML(
             <p style="color:#64748b;font-size:11px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Net Profit</p>
             <p style="color:${netIncome >= 0 ? '#10b981' : '#ef4444'};font-size:24px;font-weight:700;margin:4px 0">${netIncomeStr}</p>
           </td>
-          <td style="width:50%;padding:16px;text-align:center;background:#eef2ff;border-radius:8px;margin-left:8px">
-            <p style="color:#64748b;font-size:11px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Profit Margin</p>
-            <p style="color:#6366f1;font-size:24px;font-weight:700;margin:4px 0">${marginStr}%</p>
+            <td style="width:50%;padding:16px;text-align:center;background:${pcLightest};border-radius:8px;margin-left:8px">
+              <p style="color:#64748b;font-size:11px;margin:0;text-transform:uppercase;letter-spacing:0.5px">Profit Margin</p>
+            <p style="color:${pc};font-size:24px;font-weight:700;margin:4px 0">${marginStr}%</p>
           </td>
         </tr>
       </table>
@@ -265,9 +279,9 @@ export function generateReportHTML(
           <th style="padding:8px 12px;text-align:right;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Amount</th>
         </tr></thead>
         <tbody>${bsRows('asset')}</tbody>
-        <tfoot><tr style="background:#eef2ff">
+        <tfoot><tr style="background:${pcLightest}">
           <td style="padding:8px 12px;font-weight:600;font-size:13px">Total Assets</td>
-          <td style="padding:8px 12px;text-align:right;font-weight:600;font-size:13px;font-family:monospace;color:#6366f1">${fmt(balanceSheet.totalAssets)}</td>
+          <td style="padding:8px 12px;text-align:right;font-weight:600;font-size:13px;font-family:monospace;color:${pc}">${fmt(balanceSheet.totalAssets)}</td>
         </tr></tfoot>
       </table>
       <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-top:12px">
@@ -308,15 +322,15 @@ export function generateReportHTML(
 
     ${safeShareLink ? `
     <tr><td style="padding:0 24px 24px">
-      <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:16px;text-align:center">
-        <p style="color:#4338ca;font-size:14px;font-weight:600;margin:0 0 8px">View Live Report</p>
-        <a href="${safeShareLink}" style="color:#6366f1;font-size:13px;word-break:break-all">${safeShareLink}</a>
+      <div style="background:${pcLightest};border:1px solid ${pcLighter};border-radius:8px;padding:16px;text-align:center">
+        <p style="color:${pc};font-size:14px;font-weight:600;margin:0 0 8px">View Live Report</p>
+        <a href="${safeShareLink}" style="color:${pc};font-size:13px;word-break:break-all">${safeShareLink}</a>
         <p style="color:#64748b;font-size:12px;margin:8px 0 0">Open this link anytime to see your up-to-date financial data.</p>
       </div>
     </td></tr>` : ''}
 
     <tr><td style="background:#f8fafc;padding:16px;text-align:center;color:#94a3b8;font-size:12px">
-      <p style="margin:0">Generated by Bookkeeping Platform</p>
+      <p style="margin:0">Generated by ${brandCompanyName}</p>
     </td></tr>
   </table>
 </body>

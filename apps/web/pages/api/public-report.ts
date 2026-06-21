@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import dbConnect from '@/lib/mongoose';
 import Client from '@/lib/models/Client';
+import User from '@/lib/models/User';
 import { getFinancialStatements } from '@/lib/reports';
 import { generateWorkbook } from '@/lib/excel';
 
@@ -20,7 +21,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { startDate, endDate, type, download } = req.query;
 
     if (download === 'excel') {
-      const workbook = await generateWorkbook(uid, startDate as string, endDate as string);
+      const user = await User.findById(uid).select('brandingPrimaryColor brandingCompanyName').lean();
+      const branding = user ? { primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName } : undefined;
+      const workbook = await generateWorkbook(uid, startDate as string, endDate as string, branding);
       const buffer = await workbook.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=financial-report.xlsx');

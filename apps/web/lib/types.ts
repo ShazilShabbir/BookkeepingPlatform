@@ -1,9 +1,16 @@
+export interface BrandingOptions {
+  logo?: string;
+  primaryColor?: string;
+  companyName?: string;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   role: 'admin' | 'client' | 'viewer';
   companyName: string;
+  branding?: BrandingOptions;
   createdAt: string;
   updatedAt: string;
 }

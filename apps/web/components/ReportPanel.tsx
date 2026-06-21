@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, Button } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/format';
 
 interface AccountBalance { accountCode: string; accountName: string; balance: number; }
 interface StatementSection { title: string; type: string; total: number; accounts: AccountBalance[]; }
@@ -22,7 +23,7 @@ interface DashboardData {
 
 type ReportView = 'pl' | 'bs' | 'cf' | 'tb' | 'all';
 
-const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const fmt = (n: number, currency = 'USD') => formatCurrency(n, currency);
 
 const tabs: { id: ReportView; label: string }[] = [
   { id: 'all', label: 'All Reports' },

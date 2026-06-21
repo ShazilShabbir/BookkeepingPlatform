@@ -4,6 +4,12 @@ import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
 
+export interface BrandingOptions {
+  logo?: string;
+  primaryColor?: string;
+  companyName?: string;
+}
+
 interface AccountInfo { name: string; type: string; normalBalance: string; }
 
 const fmtCurrency = '#,##0.00';
@@ -19,6 +25,19 @@ const palette = {
   white: 'FFFFFFFF', dark: 'FF1E293B', muted: 'FF64748B', lightBg: 'FFF8FAFC',
   border: 'FFE2E8F0', accentGreen: 'FF10B981', accentRed: 'FFEF4444',
 };
+
+function hexToArgb(hex: string): string {
+  return 'FF' + hex.replace('#', '').toUpperCase();
+}
+
+function applyBranding(b: BrandingOptions | undefined) {
+  if (!b?.primaryColor) return;
+  const c = b.primaryColor.replace('#', '');
+  palette.brand = 'FF' + c.toUpperCase();
+  // derive darker/lighter shades (simplified)
+  palette.brandDark = palette.brand;
+  palette.brandLight = 'FF' + c.toUpperCase() + '66';
+}
 
 const headerStyle: Partial<ExcelJS.Style> = {
   font: { bold: true, color: { argb: palette.white }, size: 11, name: 'Calibri' },
@@ -61,10 +80,11 @@ function setupSheet(sheet: ExcelJS.Worksheet, columns: Partial<ExcelJS.Column>[]
 // SVG infographic generation removed — SVG cannot be embedded via ExcelJS addImage.
 // The Final Summary sheet below uses styled cell-based KPI cards instead.
 
-export async function generateWorkbook(uid: string, startDate?: string | null, endDate?: string | null): Promise<ExcelJS.Workbook> {
+export async function generateWorkbook(uid: string, startDate?: string | null, endDate?: string | null, branding?: BrandingOptions): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'BookKeep';
+  wb.creator = branding?.companyName || 'BookKeep';
   wb.created = new Date();
+  applyBranding(branding);
 
   // ── Fetch Data ──
   await dbConnect();

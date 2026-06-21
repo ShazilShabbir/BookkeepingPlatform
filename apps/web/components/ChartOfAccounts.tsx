@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Input, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { getCurrencySymbol, COMMON_CURRENCIES } from '@/lib/format';
 
 type Account = {
   _id: string;
@@ -8,6 +9,7 @@ type Account = {
   name: string;
   type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
   normalBalance: 'debit' | 'credit';
+  currency: string;
   parentCode?: string;
   isActive: boolean;
 };
@@ -48,6 +50,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
   const [formName, setFormName] = useState('');
   const [formType, setFormType] = useState<Account['type']>('asset');
   const [formBalance, setFormBalance] = useState<Account['normalBalance']>('debit');
+  const [formCurrency, setFormCurrency] = useState('USD');
   const [formParent, setFormParent] = useState('');
 
   const loadAccounts = async () => {
@@ -67,7 +70,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
 
   const resetForm = () => {
     setFormCode(''); setFormName(''); setFormType('asset');
-    setFormBalance('debit'); setFormParent('');
+    setFormBalance('debit'); setFormCurrency('USD'); setFormParent('');
     setShowForm(false); setEditingCode(null);
   };
 
@@ -78,7 +81,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
     }
     setSubmitting(true);
     try {
-      const body = { name: formName.trim(), type: formType, normalBalance: formBalance, parentCode: formParent || null };
+      const body = { name: formName.trim(), type: formType, normalBalance: formBalance, currency: formCurrency, parentCode: formParent || null };
       if (editingCode) {
         const json = await api(`/api/accounts/${editingCode}`, { method: 'PUT', body: JSON.stringify(body) });
         if (json.success) { toast.success('Account updated'); resetForm(); loadAccounts(); }
@@ -114,14 +117,15 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
     setFormName(account.name);
     setFormType(account.type);
     setFormBalance(account.normalBalance);
+    setFormCurrency(account.currency || 'USD');
     setFormParent(account.parentCode || '');
     setShowForm(true);
   };
 
   const handleExport = () => {
-    const headers = 'code,name,type,normalBalance,parentCode\n';
+    const headers = 'code,name,type,normalBalance,currency,parentCode\n';
     const rows = accounts.map(a =>
-      `"${a.code}","${a.name}","${a.type}","${a.normalBalance}","${a.parentCode || ''}"`
+      `"${a.code}","${a.name}","${a.type}","${a.normalBalance}","${a.currency || 'USD'}","${a.parentCode || ''}"`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -149,7 +153,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
         const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
         const row = Object.fromEntries(header.map((h, idx) => [h, cols[idx] || '']));
         try {
-          const body: Record<string, any> = { code: row.code, name: row.name, type: row.type, normalBalance: row.normalbalance || 'debit' };
+          const body: Record<string, any> = { code: row.code, name: row.name, type: row.type, normalBalance: row.normalbalance || 'debit', currency: row.currency || 'USD' };
           if (row.parentcode) body.parentCode = row.parentcode;
           await api('/api/accounts', { method: 'POST', body: JSON.stringify(body) });
           results.created++;
@@ -209,6 +213,9 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
             )}
             <span className="text-sm font-mono font-medium text-surface-700 w-16 shrink-0">{account.code}</span>
             <span className="text-sm font-medium text-surface-900 truncate">{account.name}</span>
+            {account.currency && account.currency !== 'USD' && (
+              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-surface-100 text-surface-600">{account.currency}</span>
+            )}
             <Badge variant={TYPE_BADGE_VARIANT[account.type]} size="sm">{account.normalBalance}</Badge>
             {account.parentCode && (
               <span className="text-xs text-surface-400">→ {accountMap.get(account.parentCode)?.name || account.parentCode}</span>
@@ -312,6 +319,13 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
                   className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2.5 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500">
                   <option value="debit">Debit</option>
                   <option value="credit">Credit</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-surface-700">Currency</label>
+                <select value={formCurrency} onChange={(e) => setFormCurrency(e.target.value)}
+                  className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2.5 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500">
+                  {COMMON_CURRENCIES.map((c) => (<option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>))}
                 </select>
               </div>
             </div>
