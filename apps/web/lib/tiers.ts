@@ -1,5 +1,5 @@
 export type Tier = 'free' | 'pro' | 'business';
-export type Feature = 'ai-classify' | 'excel-export' | 'share-links' | 'email-reports' | 'cash-flow' | 'trial-balance' | 'period-close' | 'customer-management' | 'multi-user' | 'custom-branding' | 'priority-support' | 'invoicing' | 'bank-reconciliation' | 'multi-currency';
+export type Feature = 'ai-classify' | 'excel-export' | 'share-links' | 'email-reports' | 'cash-flow' | 'trial-balance' | 'period-close' | 'customer-management' | 'multi-user' | 'custom-branding' | 'priority-support' | 'invoicing' | 'bank-reconciliation' | 'multi-currency' | 'custom-reports';
 
 export interface TierConfig {
   label: string;
@@ -36,6 +36,7 @@ export const TIERS: Record<Tier, TierConfig> = {
       'invoicing': false,
       'bank-reconciliation': false,
       'multi-currency': false,
+      'custom-reports': false,
     },
   },
   pro: {
@@ -61,6 +62,7 @@ export const TIERS: Record<Tier, TierConfig> = {
       'invoicing': true,
       'bank-reconciliation': true,
       'multi-currency': true,
+      'custom-reports': true,
     },
   },
   business: {
@@ -86,6 +88,7 @@ export const TIERS: Record<Tier, TierConfig> = {
       'invoicing': true,
       'bank-reconciliation': true,
       'multi-currency': true,
+      'custom-reports': true,
     },
   },
 };
@@ -105,6 +108,7 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   'invoicing': 'Invoice Creation',
   'bank-reconciliation': 'Bank Reconciliation',
   'multi-currency': 'Multi-Currency Support',
+  'custom-reports': 'Custom Report Builder',
 };
 
 export function getTier(tier: string): TierConfig {

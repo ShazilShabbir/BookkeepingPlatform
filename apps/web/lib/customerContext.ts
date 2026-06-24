@@ -4,7 +4,8 @@ import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
 
 export async function resolveUserId(token: any, requestedUserId?: string): Promise<string> {
-  const adminId = token.sub!;
+  const adminId = token.sub;
+  if (!adminId) throw new Error('Authentication token missing sub claim');
   if (!requestedUserId || requestedUserId === adminId) return adminId;
   await dbConnect();
   const customer = await User.findById(requestedUserId).select('createdBy').lean();

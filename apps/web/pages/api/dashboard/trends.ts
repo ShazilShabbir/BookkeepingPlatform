@@ -16,14 +16,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await dbConnect();
 
   try {
-    const monthsBack = parseInt((req.query.months as string) || '12');
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - monthsBack);
-    const startStr = startDate.toISOString().slice(0, 10);
+    const { startDate: sdParam, endDate: edParam, months } = req.query;
+    let dateFilter: Record<string, any> = {};
+    if (sdParam || edParam) {
+      if (sdParam) dateFilter.$gte = sdParam;
+      if (edParam) dateFilter.$lte = edParam;
+    } else {
+      const monthsBack = parseInt((months as string) || '12');
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - monthsBack);
+      dateFilter.$gte = startDate.toISOString().slice(0, 10);
+    }
 
     const entries = await JournalEntry.find({
       userId: uid,
-      date: { $gte: startStr },
+      date: dateFilter,
     }).select('_id date').lean();
 
     const entryIds = entries.map(e => (e as any)._id.toString());
@@ -32,12 +39,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const accountMap = new Map<string, string>();
     for (const a of accountDocs) accountMap.set(a.code, a.type);
 
-    const monthlyData = new Map<string, { revenue: number; expenses: number }>();
+    const monthlyData = new Map<string, { revenue: number; expenses: number; profit: number }>();
 
     for (const entry of entries) {
       const month = (entry as any).date?.slice(0, 7);
       if (!month) continue;
-      if (!monthlyData.has(month)) monthlyData.set(month, { revenue: 0, expenses: 0 });
+      if (!monthlyData.has(month)) monthlyData.set(month, { revenue: 0, expenses: 0, profit: 0 });
     }
 
     for (const line of lines) {
@@ -54,15 +61,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       else data.expenses -= net;
     }
 
-    const months = Array.from(monthlyData.entries())
+    const result = Array.from(monthlyData.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, data]) => ({
         month,
         revenue: Math.round(data.revenue * 100) / 100,
         expenses: Math.round(data.expenses * 100) / 100,
+        profit: Math.round((data.revenue - data.expenses) * 100) / 100,
       }));
 
-    return res.status(200).json({ success: true, data: months });
+    return res.status(200).json({ success: true, data: result });
   } catch (e: any) {
     console.error('dashboard trends error:', e?.message || e);
     return res.status(500).json({ success: false, error: 'Internal server error' });

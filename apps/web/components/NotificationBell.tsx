@@ -4,11 +4,11 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(0);
   const [notifications, setNotifications] = useState<{ id: string; text: string; time: string }[]>([]);
-  const ref = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -21,7 +21,7 @@ export default function NotificationBell() {
   }, []);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={bellRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
         className="relative p-2.5 sm:p-2 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"

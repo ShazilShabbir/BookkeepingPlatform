@@ -39,10 +39,10 @@ export default function CustomerFieldConfig({ customerUid, customerName, onClose
   const [renaming, setRenaming] = useState('');
 
   const loadProfile = useCallback((profileName: string, profilesList: CsvProfile[]) => {
-    const p = profilesList.find(x => x.name === profileName);
-    if (p) {
-      setCsvMapping(p.csvMapping || defaultMapping());
-      setCustomFields(p.customFields || []);
+    const profile = profilesList.find(prof => prof.name === profileName);
+    if (profile) {
+      setCsvMapping(profile.csvMapping || defaultMapping());
+      setCustomFields(profile.customFields || []);
     }
   }, []);
 

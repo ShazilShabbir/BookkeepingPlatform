@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/format';
 
 interface AccountBalance {
   accountCode: string;
@@ -23,7 +24,7 @@ interface ProfitLossData {
   netIncomeRatio: number;
 }
 
-export default function ProfitLoss() {
+export default memo(function ProfitLoss() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [data, setData] = useState<ProfitLossData | null>(null);
@@ -40,16 +41,14 @@ export default function ProfitLoss() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load P&L');
       setData(json.data);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load P&L');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load P&L');
     } finally {
       setLoading(false);
     }
   }, [startDate, endDate]);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
     <Card padding="lg">
@@ -91,14 +90,14 @@ export default function ProfitLoss() {
                 <div key={section.type}>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-base font-semibold text-surface-900">{section.title}</h3>
-                    <span className="text-lg font-bold text-surface-900">{fmt(section.total)}</span>
+                    <span className="text-lg font-bold text-surface-900">{formatCurrency(section.total)}</span>
                   </div>
                   <div className="overflow-x-auto border border-surface-200 rounded-lg">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-surface-100">
-                          <th className="py-2 px-4 text-left font-medium text-surface-600">Account</th>
-                          <th className="py-2 px-4 text-right font-medium text-surface-600">Amount</th>
+                          <th scope="col" className="py-2 px-4 text-left font-medium text-surface-600">Account</th>
+                          <th scope="col" className="py-2 px-4 text-right font-medium text-surface-600">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -109,7 +108,7 @@ export default function ProfitLoss() {
                               <span className="text-surface-900">{acc.accountName}</span>
                             </td>
                             <td className="py-2 px-4 text-right font-mono font-medium text-surface-900">
-                              {fmt(acc.balance)}
+                              {formatCurrency(acc.balance)}
                             </td>
                           </tr>
                         ))}
@@ -129,7 +128,7 @@ export default function ProfitLoss() {
                   </div>
                   <div className="text-right">
                     <p className={`text-2xl font-bold ${data.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {fmt(data.netIncome)}
+                      {formatCurrency(data.netIncome)}
                     </p>
                     <p className="text-sm text-surface-500">
                       Margin: <span className="font-semibold">{data.netIncomeRatio}%</span>
@@ -143,4 +142,4 @@ export default function ProfitLoss() {
       )}
     </Card>
   );
-}
+});

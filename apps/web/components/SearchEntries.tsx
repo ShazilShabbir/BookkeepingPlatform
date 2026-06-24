@@ -71,6 +71,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
   const [saving, setSaving] = useState(false);
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!customerUid) return;
@@ -93,6 +94,10 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
     };
     loadAccounts();
   }, [userId]);
+
+  useEffect(() => {
+    return () => { searchAbortRef.current?.abort(); };
+  }, []);
 
   const accountTypeMap = new Map(accounts.map(a => [a.code, a.type]));
 
@@ -130,11 +135,15 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
   };
 
   const doSearch = useCallback(async (append = false) => {
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     setLoading(true);
     try {
       const currentPage = append ? page + 1 : 1;
+      const sanitizedQuery = query.replace(/<[^>]*>/g, '').trim().slice(0, 100);
       const params = new URLSearchParams();
-      if (query) params.set('q', query);
+      if (sanitizedQuery) params.set('q', sanitizedQuery);
       if (typeFilter) params.set('type', typeFilter);
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
@@ -142,7 +151,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
       params.set('page', String(page));
       params.set('pageSize', '50');
 
-      const res = await fetch(`/api/entries/search?${params.toString()}`);
+      const res = await fetch(`/api/entries/search?${params.toString()}`, { signal: controller.signal });
       const json: SearchResponse = await res.json();
       if (!json.success) throw new Error('Search failed');
 
@@ -152,11 +161,12 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
       setPage(currentPage);
       setTotal(json.total);
       setSearched(true);
-    } catch (err: any) {
-      toast.error(err.message || 'Search failed');
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      toast.error(err instanceof Error ? err.message : 'Search failed');
       if (!append) setEntries([]);
     } finally {
-      setLoading(false);
+      if (searchAbortRef.current === controller) setLoading(false);
     }
   }, [query, typeFilter, startDate, endDate, page, accounts]);
 
@@ -216,8 +226,8 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
         return { ...e, date: editForm.date || e.date, description: editForm.description || e.description };
       }));
       cancelEdit();
-    } catch (err: any) {
-      toast.error(err.message || 'Save failed');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -232,8 +242,8 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
       toast.success('Entry deleted');
       setEntries(prev => prev.filter(e => e.id !== entry.id));
       setTotal(prev => prev - 1);
-    } catch (err: any) {
-      toast.error(err.message || 'Delete failed');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed');
     }
   };
 
@@ -365,10 +375,10 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="bg-surface-100">
-                                <th className="py-1.5 px-3 text-left font-medium text-surface-600">Account</th>
-                                <th className="py-1.5 px-3 text-left font-medium text-surface-600">Description</th>
-                                <th className="py-1.5 px-3 text-right font-medium text-surface-600">Debit</th>
-                                <th className="py-1.5 px-3 text-right font-medium text-surface-600">Credit</th>
+                                <th scope="col" className="py-1.5 px-3 text-left font-medium text-surface-600">Account</th>
+                                <th scope="col" className="py-1.5 px-3 text-left font-medium text-surface-600">Description</th>
+                                <th scope="col" className="py-1.5 px-3 text-right font-medium text-surface-600">Debit</th>
+                                <th scope="col" className="py-1.5 px-3 text-right font-medium text-surface-600">Credit</th>
                               </tr>
                             </thead>
                             <tbody>

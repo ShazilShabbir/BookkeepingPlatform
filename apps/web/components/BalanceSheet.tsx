@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { memo, useState, useCallback, useEffect, useMemo } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/format';
 
 interface AccountBalance {
   accountCode: string;
@@ -21,7 +22,7 @@ interface BalanceSheetData {
   sections: StatementSection[];
 }
 
-export default function BalanceSheet() {
+export default memo(function BalanceSheet() {
   const [asOfDate, setAsOfDate] = useState(new Date().toISOString().split('T')[0]);
   const [data, setData] = useState<BalanceSheetData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,16 +35,23 @@ export default function BalanceSheet() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load balance sheet');
       setData(json.data);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load balance sheet');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load balance sheet');
     } finally {
       setLoading(false);
     }
   }, [asOfDate]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const balanceStatus = useMemo(() => {
+    if (!data) return '';
+    const assets = data.sections.find(s => s.type === 'asset')?.total || 0;
+    const liabilities = data.sections.find(s => s.type === 'liability')?.total || 0;
+    const equity = data.sections.find(s => s.type === 'equity')?.total || 0;
+    const diff = Math.abs(assets - liabilities - equity);
+    return diff < 0.01 ? '✓ Balanced' : `✗ Off by ${formatCurrency(diff)}`;
+  }, [data]);
 
   return (
     <Card padding="lg">
@@ -80,14 +88,14 @@ export default function BalanceSheet() {
                 <div key={section.type}>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-base font-semibold text-surface-900">{section.title}</h3>
-                    <span className="text-lg font-bold text-surface-900">{fmt(section.total)}</span>
+                    <span className="text-lg font-bold text-surface-900">{formatCurrency(section.total)}</span>
                   </div>
                   <div className="overflow-x-auto border border-surface-200 rounded-lg">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-surface-100">
-                          <th className="py-2 px-4 text-left font-medium text-surface-600">Account</th>
-                          <th className="py-2 px-4 text-right font-medium text-surface-600">Balance</th>
+                          <th scope="col" className="py-2 px-4 text-left font-medium text-surface-600">Account</th>
+                          <th scope="col" className="py-2 px-4 text-right font-medium text-surface-600">Balance</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -100,7 +108,7 @@ export default function BalanceSheet() {
                               <span className="text-surface-900">{acc.accountName}</span>
                             </td>
                             <td className="py-2 px-4 text-right font-mono font-medium text-surface-900">
-                              {acc.balance >= 0 ? fmt(acc.balance) : `(${fmt(Math.abs(acc.balance))})`}
+                              {acc.balance >= 0 ? formatCurrency(acc.balance) : `(${formatCurrency(Math.abs(acc.balance))})`}
                             </td>
                           </tr>
                         ))}
@@ -115,19 +123,19 @@ export default function BalanceSheet() {
                   <div>
                     <p className="text-xs text-surface-500 uppercase tracking-wider font-medium">Total Assets</p>
                     <p className="text-xl font-bold text-primary-600 mt-1">
-                      {fmt(data.sections.find(s => s.type === 'asset')?.total || 0)}
+                      {formatCurrency(data.sections.find(s => s.type === 'asset')?.total || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-surface-500 uppercase tracking-wider font-medium">Total Liabilities</p>
                     <p className="text-xl font-bold text-amber-600 mt-1">
-                      {fmt(data.sections.find(s => s.type === 'liability')?.total || 0)}
+                      {formatCurrency(data.sections.find(s => s.type === 'liability')?.total || 0)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-surface-500 uppercase tracking-wider font-medium">Total Equity</p>
                     <p className="text-xl font-bold text-emerald-600 mt-1">
-                      {fmt(data.sections.find(s => s.type === 'equity')?.total || 0)}
+                      {formatCurrency(data.sections.find(s => s.type === 'equity')?.total || 0)}
                     </p>
                   </div>
                 </div>
@@ -135,15 +143,7 @@ export default function BalanceSheet() {
                   <p className="text-xs text-surface-400">
                     Assets = Liabilities + Equity
                     {' '}
-                    {(() => {
-                      const assets = data.sections.find(s => s.type === 'asset')?.total || 0;
-                      const liabilities = data.sections.find(s => s.type === 'liability')?.total || 0;
-                      const equity = data.sections.find(s => s.type === 'equity')?.total || 0;
-                      const diff = Math.abs(assets - (liabilities + equity));
-                      return diff < 0.01
-                        ? <span className="text-emerald-600 font-medium">✓ Balanced</span>
-                        : <span className="text-red-600 font-medium">⚠ Off by {fmt(diff)}</span>;
-                    })()}
+                    {balanceStatus}
                   </p>
                 </div>
               </div>
@@ -153,4 +153,4 @@ export default function BalanceSheet() {
       )}
     </Card>
   );
-}
+});

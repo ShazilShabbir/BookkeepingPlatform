@@ -103,10 +103,10 @@ export default function InvoiceDetail({ invoice, onClose, onUpdate }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-200">
-                  <th className="text-left py-2 px-2 font-medium text-surface-500">Description</th>
-                  <th className="text-right py-2 px-2 font-medium text-surface-500">Qty</th>
-                  <th className="text-right py-2 px-2 font-medium text-surface-500">Unit Price</th>
-                  <th className="text-right py-2 px-2 font-medium text-surface-500">Amount</th>
+                  <th scope="col" className="text-left py-2 px-2 font-medium text-surface-500">Description</th>
+                  <th scope="col" className="text-right py-2 px-2 font-medium text-surface-500">Qty</th>
+                  <th scope="col" className="text-right py-2 px-2 font-medium text-surface-500">Unit Price</th>
+                  <th scope="col" className="text-right py-2 px-2 font-medium text-surface-500">Amount</th>
                 </tr>
               </thead>
               <tbody>

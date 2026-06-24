@@ -31,7 +31,6 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
           'transition-all duration-200',
           paddingStyles[padding],
           accentStyles[accent],
-          'pt-[calc(var(--card-p-top,0px))]',
           className,
         )}
         {...props}

@@ -70,8 +70,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const otpauth = generateOTPAuthURL(secret, u.email);
   const matrix = generateQRMatrix(otpauth);
   const qrDataUrl = matrixToBMPDataURL(matrix);
-  console.log(`QR: size=${matrix.length}x${matrix.length}, dataURL length=${qrDataUrl.length}, starts=${qrDataUrl.slice(0, 50)}`);
-
   await User.findByIdAndUpdate(token.sub, { totpSecret: secret });
 
   return res.status(200).json({ secret, otpauth, qrDataUrl, email: u.email });

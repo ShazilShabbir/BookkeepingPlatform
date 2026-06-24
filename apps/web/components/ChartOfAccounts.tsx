@@ -141,7 +141,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
     setImporting(true);
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
+      const lines = text.split('\n').filter(line => line.trim());
       if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
       const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
       if (!header.includes('code') || !header.includes('name') || !header.includes('type')) {

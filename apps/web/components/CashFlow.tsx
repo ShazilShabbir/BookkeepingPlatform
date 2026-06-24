@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/format';
 
 interface CashFlowItem {
   accountCode: string;
@@ -20,7 +21,7 @@ interface CashFlowData {
   dateRange: { startDate: string | null; endDate: string | null };
 }
 
-export default function CashFlow() {
+export default memo(function CashFlow() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [data, setData] = useState<CashFlowData | null>(null);
@@ -44,9 +45,7 @@ export default function CashFlow() {
     }
   }, [startDate, endDate]);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   return (
     <Card padding="lg">
@@ -89,15 +88,15 @@ export default function CashFlow() {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-base font-semibold text-surface-900">{section.title}</h3>
                     <span className={`text-lg font-bold ${section.total >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {fmt(section.total)}
+                      {formatCurrency(section.total)}
                     </span>
                   </div>
                   <div className="overflow-x-auto border border-surface-200 rounded-lg">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-surface-100">
-                          <th className="py-2 px-4 text-left font-medium text-surface-600">Account</th>
-                          <th className="py-2 px-4 text-right font-medium text-surface-600">Amount</th>
+                          <th scope="col" className="py-2 px-4 text-left font-medium text-surface-600">Account</th>
+                          <th scope="col" className="py-2 px-4 text-right font-medium text-surface-600">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -108,7 +107,7 @@ export default function CashFlow() {
                               <span className="text-surface-900">{item.accountName}</span>
                             </td>
                             <td className={`py-2 px-4 text-right font-mono font-medium ${item.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {item.amount >= 0 ? fmt(item.amount) : `(${fmt(Math.abs(item.amount))}`}
+                              {item.amount >= 0 ? formatCurrency(item.amount) : `(${formatCurrency(Math.abs(item.amount))})`}
                             </td>
                           </tr>
                         ))}
@@ -128,7 +127,7 @@ export default function CashFlow() {
                   </div>
                   <div className="text-right">
                     <p className={`text-2xl font-bold ${data.totalChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {fmt(data.totalChange)}
+                      {formatCurrency(data.totalChange)}
                     </p>
                   </div>
                 </div>
@@ -139,4 +138,4 @@ export default function CashFlow() {
       )}
     </Card>
   );
-}
+});

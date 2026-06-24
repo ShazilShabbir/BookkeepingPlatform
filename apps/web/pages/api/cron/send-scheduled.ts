@@ -33,14 +33,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const resend = new Resend(process.env.RESEND_API_KEY);
     let sent = 0;
 
+    const userIds = [...new Set(schedules.map(s => (s as any).userId))];
+    const clientIds = schedules.map(s => (s as any).clientId).filter(Boolean);
+    const [users, clients] = await Promise.all([
+      User.find({ _id: { $in: userIds } }).lean(),
+      Client.find({ _id: { $in: clientIds } }).lean(),
+    ]);
+    const userMap = new Map(users.map(u => [(u as any)._id.toString(), u]));
+    const clientMap = new Map(clients.map(c => [(c as any)._id.toString(), c]));
+
     for (const schedule of schedules) {
       try {
-        const user = await User.findById((schedule as any).userId).lean();
+        const user = userMap.get((schedule as any).userId);
         if (!user) continue;
         const ownerName = (user as any)?.name || 'Business Owner';
         const branding = { logo: (user as any).brandingLogo, primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName };
 
-        const client = await Client.findOne({ _id: (schedule as any).clientId }).lean();
+        const client = (schedule as any).clientId ? clientMap.get((schedule as any).clientId) : null;
         const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
 
         const statements = await getFinancialStatements((schedule as any).userId);

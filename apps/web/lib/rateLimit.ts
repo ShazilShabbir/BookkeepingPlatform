@@ -1,17 +1,25 @@
 const store = new Map<string, { count: number; resetAt: number }>();
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+let lastCleanup = Date.now();
 
 export function rateLimit(opts: { interval: number; max: number }) {
   return (key: string): { allowed: boolean; remaining: number; resetIn: number } => {
     const now = Date.now();
+    if (now - lastCleanup > CLEANUP_INTERVAL) {
+      lastCleanup = now;
+      for (const [k, entry] of store) {
+        if (now > entry.resetAt) store.delete(k);
+      }
+    }
     const entry = store.get(key);
     if (!entry || now > entry.resetAt) {
       store.set(key, { count: 1, resetAt: now + opts.interval });
       return { allowed: true, remaining: opts.max - 1, resetIn: opts.interval };
     }
-    if (entry.count >= opts.max) {
+    if (++entry.count > opts.max) {
+      entry.count--;
       return { allowed: false, remaining: 0, resetIn: entry.resetAt - now };
     }
-    entry.count++;
     return { allowed: true, remaining: opts.max - entry.count, resetIn: entry.resetAt - now };
   };
 }

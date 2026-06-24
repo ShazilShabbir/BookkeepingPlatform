@@ -115,7 +115,7 @@ export default function Login() {
           <meta name="robots" content="noindex" />
         </Head>
         <div className="min-h-screen bg-gradient-to-br from-surface-50 to-surface-100 flex items-center justify-center py-12 px-4">
-          <Card padding="lg" className="w-full max-w-md animate-scale-in">
+          <Card padding="lg" className="w-full max-w-md animate-slide-up">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary-50 text-primary-600 mb-4">
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -165,14 +165,14 @@ export default function Login() {
         <meta name="robots" content="noindex" />
       </Head>
       <div className="min-h-screen bg-gradient-to-br from-surface-50 to-surface-100 flex items-center justify-center py-12 px-4">
-      <Card padding="lg" className="w-full max-w-md animate-scale-in">
+      <Card padding="lg" className="w-full max-w-md animate-slide-up">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary-50 text-primary-600 mb-4">
             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-surface-900">Welcome back</h1>
+          <h1 className="text-2xl font-semibold text-surface-900">Welcome back</h1>
           <p className="mt-1 text-surface-500">Sign in to your account</p>
         </div>
 

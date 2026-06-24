@@ -21,8 +21,8 @@ export default function Navbar({ pathname }: { pathname: string }) {
     try {
       await signOut({ callbackUrl: '/login' });
       toast.success('Logged out');
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Logout failed');
     }
   };
 

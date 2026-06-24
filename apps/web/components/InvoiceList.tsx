@@ -87,15 +87,14 @@ export default function InvoiceList({ userId }: { userId: string }) {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex gap-1 flex-wrap">
           {['all', 'draft', 'sent', 'paid', 'overdue', 'cancelled'].map((s) => (
-            <button
+            <Button
               key={s}
+              size="sm"
+              variant={statusFilter === s ? 'primary' : 'secondary'}
               onClick={() => { setStatusFilter(s); setPage(1); }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                statusFilter === s ? 'bg-primary-50 text-primary-700' : 'text-surface-500 hover:text-surface-700 hover:bg-surface-50'
-              }`}
             >
               {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
+            </Button>
           ))}
         </div>
         <Input
@@ -125,13 +124,13 @@ export default function InvoiceList({ userId }: { userId: string }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-surface-50 border-b border-surface-200">
-                  <th className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Invoice</th>
-                  <th className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Client</th>
-                  <th className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-surface-700" onClick={() => handleSort('date')}>Date <SortIcon column="date" /></th>
-                  <th className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-surface-700" onClick={() => handleSort('due')}>Due <SortIcon column="due" /></th>
-                  <th className="text-right py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-surface-700" onClick={() => handleSort('amount')}>Amount <SortIcon column="amount" /></th>
-                  <th className="text-center py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Status</th>
-                  <th className="text-right py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Actions</th>
+                  <th scope="col" className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Invoice</th>
+                  <th scope="col" className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Client</th>
+                  <th scope="col" className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-surface-700" onClick={() => handleSort('date')}>Date <SortIcon column="date" /></th>
+                  <th scope="col" className="text-left py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-surface-700" onClick={() => handleSort('due')}>Due <SortIcon column="due" /></th>
+                  <th scope="col" className="text-right py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-surface-700" onClick={() => handleSort('amount')}>Amount <SortIcon column="amount" /></th>
+                  <th scope="col" className="text-center py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Status</th>
+                  <th scope="col" className="text-right py-3 px-3 font-medium text-surface-500 text-xs uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,9 +166,9 @@ export default function InvoiceList({ userId }: { userId: string }) {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
-              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 text-sm rounded-lg border border-surface-200 disabled:opacity-50 hover:bg-surface-50">Previous</button>
+              <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
               <span className="text-sm text-surface-500">Page {page} of {totalPages}</span>
-              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 text-sm rounded-lg border border-surface-200 disabled:opacity-50 hover:bg-surface-50">Next</button>
+              <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
             </div>
           )}
         </>

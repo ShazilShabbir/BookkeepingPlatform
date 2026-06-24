@@ -4,6 +4,17 @@ const store = new Map<string, { count: number; resetAt: number }>();
 
 const WINDOW = 60 * 1000;
 const MAX_PER_WINDOW = 60;
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+let lastCleanup = Date.now();
+
+function cleanupStale(): void {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+  for (const [key, entry] of store) {
+    if (now > entry.resetAt) store.delete(key);
+  }
+}
 
 export function getClientIp(req: NextApiRequest): string {
   return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
@@ -13,16 +24,17 @@ export function getClientIp(req: NextApiRequest): string {
 }
 
 export function checkApiRateLimit(ip: string): { allowed: boolean; remaining: number; resetIn: number } {
+  cleanupStale();
   const now = Date.now();
   const entry = store.get(ip);
   if (!entry || now > entry.resetAt) {
     store.set(ip, { count: 1, resetAt: now + WINDOW });
     return { allowed: true, remaining: MAX_PER_WINDOW - 1, resetIn: WINDOW };
   }
-  if (entry.count >= MAX_PER_WINDOW) {
+  if (++entry.count > MAX_PER_WINDOW) {
+    entry.count--;
     return { allowed: false, remaining: 0, resetIn: entry.resetAt - now };
   }
-  entry.count++;
   return { allowed: true, remaining: MAX_PER_WINDOW - entry.count, resetIn: entry.resetAt - now };
 }
 

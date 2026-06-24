@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -20,7 +20,7 @@ interface LineItem {
 
 interface AccountOption { code: string; name: string; }
 
-function fmt(n: number, currency = 'USD') { return formatCurrency(n, currency); }
+
 
 export default function Reconcile({ userId }: { userId: string }) {
   const [step, setStep] = useState<Step>('setup');
@@ -240,8 +240,8 @@ export default function Reconcile({ userId }: { userId: string }) {
             <select value={accountCode} onChange={e => setAccountCode(e.target.value)}
               className="w-full border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white">
               <option value="">Select account...</option>
-              {accounts.filter(a => a.code.startsWith('1')).map(a => (
-                <option key={a.code} value={a.code}>{a.code} — {a.name}</option>
+              {accounts.filter(acct => acct.code.startsWith('1')).map(acct => (
+                <option key={acct.code} value={acct.code}>{acct.code} — {acct.name}</option>
               ))}
             </select>
           </div>
@@ -284,12 +284,12 @@ export default function Reconcile({ userId }: { userId: string }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-surface-50">
-                  <th className="py-2 px-3 text-left font-medium text-surface-500">Account</th>
-                  <th className="py-2 px-3 text-left font-medium text-surface-500">Period</th>
-                  <th className="py-2 px-3 text-center font-medium text-surface-500">Status</th>
-                  <th className="py-2 px-3 text-right font-medium text-surface-500">Difference</th>
-                  <th className="py-2 px-3 text-right font-medium text-surface-500">Date</th>
-                  <th className="py-2 px-3" />
+                  <th scope="col" className="py-2 px-3 text-left font-medium text-surface-500">Account</th>
+                  <th scope="col" className="py-2 px-3 text-left font-medium text-surface-500">Period</th>
+                  <th scope="col" className="py-2 px-3 text-center font-medium text-surface-500">Status</th>
+                  <th scope="col" className="py-2 px-3 text-right font-medium text-surface-500">Difference</th>
+                  <th scope="col" className="py-2 px-3 text-right font-medium text-surface-500">Date</th>
+                  <th scope="col" className="py-2 px-3" />
                 </tr>
               </thead>
               <tbody>
@@ -302,7 +302,7 @@ export default function Reconcile({ userId }: { userId: string }) {
                         {h.status}
                       </Badge>
                     </td>
-                    <td className="py-2 px-3 text-right font-mono">{fmt(h.difference || 0)}</td>
+                    <td className="py-2 px-3 text-right font-mono">{formatCurrency(h.difference || 0)}</td>
                     <td className="py-2 px-3 text-right text-surface-500">{new Date(h.createdAt).toLocaleDateString()}</td>
                     <td className="py-2 px-3 text-right">
                       <button onClick={() => loadHistoryDetail(h._id)} className="text-primary-600 hover:text-primary-700 text-xs font-medium">View</button>
@@ -345,20 +345,20 @@ export default function Reconcile({ userId }: { userId: string }) {
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
             <div className="bg-surface-50 rounded-lg p-3 text-center">
               <p className="text-xs text-surface-500">Starting Balance</p>
-              <p className="text-sm font-bold text-surface-900">{fmt(stats.startingBalance || 0)}</p>
+              <p className="text-sm font-bold text-surface-900">{formatCurrency(stats.startingBalance || 0)}</p>
             </div>
             <div className="bg-surface-50 rounded-lg p-3 text-center">
               <p className="text-xs text-surface-500">Statement Balance</p>
-              <p className="text-sm font-bold text-surface-900">{fmt(stats.statementBalance || 0)}</p>
+              <p className="text-sm font-bold text-surface-900">{formatCurrency(stats.statementBalance || 0)}</p>
             </div>
             <div className="bg-surface-50 rounded-lg p-3 text-center">
               <p className="text-xs text-surface-500">Ledger Total</p>
-              <p className="text-sm font-bold text-surface-900">{fmt(stats.ledgerBalance || 0)}</p>
+              <p className="text-sm font-bold text-surface-900">{formatCurrency(stats.ledgerBalance || 0)}</p>
             </div>
             <div className="bg-surface-50 rounded-lg p-3 text-center">
               <p className="text-xs text-surface-500">Difference</p>
               <p className={clsx('text-sm font-bold', (stats.difference || 0) === 0 ? 'text-emerald-600' : 'text-red-600')}>
-                {fmt(stats.difference || 0)}
+                {formatCurrency(stats.difference || 0)}
               </p>
             </div>
             <div className="bg-surface-50 rounded-lg p-3 text-center">
@@ -403,7 +403,7 @@ export default function Reconcile({ userId }: { userId: string }) {
                       <div className="bg-surface-50 rounded-lg p-3">
                         <p className="text-xs text-surface-400">{line.date}</p>
                         <p className="font-medium text-surface-900">{line.description}</p>
-                        <p className="text-lg font-bold text-surface-900">{fmt(line.amount)}</p>
+                        <p className="text-lg font-bold text-surface-900">{formatCurrency(line.amount)}</p>
                       </div>
                       <div className="flex gap-2">
                         <Button onClick={() => { handleMatchAction(selectedLineId, 'match', line.matchedEntryId || undefined); setSelectedLineId(null); }}
@@ -432,7 +432,7 @@ export default function Reconcile({ userId }: { userId: string }) {
                                 line.matchedEntryId === entry._id ? 'border-emerald-300 bg-emerald-50' : 'border-surface-200 hover:bg-surface-50')}>
                               <p className="text-xs text-surface-400">{entry.date}</p>
                               <p className="text-sm font-medium text-surface-900">{entry.description || 'No description'}</p>
-                              <p className="text-sm font-bold text-surface-700">{fmt(entry.totalAmount || 0)}</p>
+                              <p className="text-sm font-bold text-surface-700">{formatCurrency(entry.totalAmount || 0)}</p>
                             </button>
                           ))}
                         </div>
@@ -455,11 +455,11 @@ export default function Reconcile({ userId }: { userId: string }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-surface-100">
-                    <th className="py-2 px-3 text-left font-medium text-surface-500">Date</th>
-                    <th className="py-2 px-3 text-left font-medium text-surface-500">Description</th>
-                    <th className="py-2 px-3 text-right font-medium text-surface-500">Amount</th>
-                    <th className="py-2 px-3 text-center font-medium text-surface-500">Match</th>
-                    <th className="py-2 px-3" />
+                    <th scope="col" className="py-2 px-3 text-left font-medium text-surface-500">Date</th>
+                    <th scope="col" className="py-2 px-3 text-left font-medium text-surface-500">Description</th>
+                    <th scope="col" className="py-2 px-3 text-right font-medium text-surface-500">Amount</th>
+                    <th scope="col" className="py-2 px-3 text-center font-medium text-surface-500">Match</th>
+                    <th scope="col" className="py-2 px-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -467,7 +467,7 @@ export default function Reconcile({ userId }: { userId: string }) {
                     <tr key={line._id} className="border-t border-surface-100 hover:bg-surface-50">
                       <td className="py-2 px-3 text-surface-600 whitespace-nowrap">{line.date}</td>
                       <td className="py-2 px-3 text-surface-900 max-w-md truncate">{line.description || '—'}</td>
-                      <td className="py-2 px-3 text-right font-mono font-medium text-surface-900">{fmt(line.amount)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-medium text-surface-900">{formatCurrency(line.amount)}</td>
                       <td className="py-2 px-3 text-center">
                         {line.confidence > 0 && (
                           <span className={clsx('text-xs font-medium', line.confidence >= 0.85 ? 'text-emerald-600' : line.confidence >= 0.6 ? 'text-amber-600' : 'text-red-600')}>
@@ -518,26 +518,26 @@ export default function Reconcile({ userId }: { userId: string }) {
               </svg>
               <p className="text-sm font-semibold text-emerald-800">Reconciliation Complete</p>
               <p className="text-xs text-emerald-600 mt-1">
-                {stats.difference === 0 ? 'Perfect match!' : `Difference: ${fmt(stats.difference)}`}
+                {stats.difference === 0 ? 'Perfect match!' : `Difference: ${formatCurrency(stats.difference)}`}
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Starting Balance</p>
-                <p className="text-lg font-bold text-surface-900">{fmt(stats.startingBalance || 0)}</p>
+                <p className="text-lg font-bold text-surface-900">{formatCurrency(stats.startingBalance || 0)}</p>
               </div>
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Statement Balance</p>
-                <p className="text-lg font-bold text-surface-900">{fmt(stats.statementBalance || 0)}</p>
+                <p className="text-lg font-bold text-surface-900">{formatCurrency(stats.statementBalance || 0)}</p>
               </div>
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Ledger Balance</p>
-                <p className="text-lg font-bold text-surface-900">{fmt(stats.ledgerBalance || 0)}</p>
+                <p className="text-lg font-bold text-surface-900">{formatCurrency(stats.ledgerBalance || 0)}</p>
               </div>
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Difference</p>
                 <p className={clsx('text-lg font-bold', (stats.difference || 0) === 0 ? 'text-emerald-600' : 'text-red-600')}>
-                  {fmt(stats.difference || 0)}
+                  {formatCurrency(stats.difference || 0)}
                 </p>
               </div>
             </div>
@@ -552,20 +552,20 @@ export default function Reconcile({ userId }: { userId: string }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Starting Balance</p>
-                <p className="text-lg font-bold text-surface-900">{fmt(stats?.startingBalance || 0)}</p>
+                <p className="text-lg font-bold text-surface-900">{formatCurrency(stats?.startingBalance || 0)}</p>
               </div>
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Statement Balance</p>
-                <p className="text-lg font-bold text-surface-900">{fmt(stats?.statementBalance || 0)}</p>
+                <p className="text-lg font-bold text-surface-900">{formatCurrency(stats?.statementBalance || 0)}</p>
               </div>
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Ledger Balance</p>
-                <p className="text-lg font-bold text-surface-900">{fmt(stats?.ledgerBalance || 0)}</p>
+                <p className="text-lg font-bold text-surface-900">{formatCurrency(stats?.ledgerBalance || 0)}</p>
               </div>
               <div className="bg-surface-50 rounded-lg p-3 text-center">
                 <p className="text-xs text-surface-500">Difference</p>
                 <p className={clsx('text-lg font-bold', (stats?.difference || 0) === 0 ? 'text-emerald-600' : 'text-red-600')}>
-                  {fmt(stats?.difference || 0)}
+                  {formatCurrency(stats?.difference || 0)}
                 </p>
               </div>
             </div>
@@ -586,10 +586,10 @@ export default function Reconcile({ userId }: { userId: string }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-surface-100">
-                  <th className="py-2 px-3 text-left font-medium text-surface-500">Date</th>
-                  <th className="py-2 px-3 text-left font-medium text-surface-500">Description</th>
-                  <th className="py-2 px-3 text-right font-medium text-surface-500">Amount</th>
-                  <th className="py-2 px-3 text-center font-medium text-surface-500">Status</th>
+                  <th scope="col" className="py-2 px-3 text-left font-medium text-surface-500">Date</th>
+                  <th scope="col" className="py-2 px-3 text-left font-medium text-surface-500">Description</th>
+                  <th scope="col" className="py-2 px-3 text-right font-medium text-surface-500">Amount</th>
+                  <th scope="col" className="py-2 px-3 text-center font-medium text-surface-500">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -597,7 +597,7 @@ export default function Reconcile({ userId }: { userId: string }) {
                   <tr key={line._id} className="border-t border-surface-100">
                     <td className="py-2 px-3 text-surface-600">{line.date}</td>
                     <td className="py-2 px-3 text-surface-900 max-w-md truncate">{line.description || '—'}</td>
-                    <td className="py-2 px-3 text-right font-mono text-surface-900">{fmt(line.amount)}</td>
+                    <td className="py-2 px-3 text-right font-mono text-surface-900">{formatCurrency(line.amount)}</td>
                     <td className="py-2 px-3 text-center">
                       <Badge className={line.status === 'matched' ? 'bg-emerald-100 text-emerald-700' : line.status === 'excluded' ? 'bg-surface-100 text-surface-500' : 'bg-red-100 text-red-700'}>
                         {line.status}

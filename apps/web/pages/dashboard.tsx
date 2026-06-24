@@ -17,29 +17,33 @@ import TrashPanel from '@/components/TrashPanel';
 import TeamMembers from '@/components/TeamMembers';
 import InvoiceList from '@/components/InvoiceList';
 import SupportTickets from '@/components/SupportTickets';
+import BudgetPanel from '@/components/BudgetPanel';
+import CustomReportList from '@/components/CustomReportList';
+import CustomReportBuilder from '@/components/CustomReportBuilder';
+import CustomReportViewer from '@/components/CustomReportViewer';
 
-import { Tabs } from '@/components/ui';
 import Head from 'next/head';
-import DashboardHeader from '@/components/DashboardHeader';
-import GroupedTabs, { ALL_TAB_IDS } from '@/components/GroupedTabs';
+import { ALL_SIDEBAR_IDS } from '@/lib/navigation';
 
-const mobileTabItems = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'accounts', label: 'Accounts' },
-  { id: 'invoices', label: 'Invoices' },
-  { id: 'reclassify', label: 'Reclassify' },
-  { id: 'import', label: 'Import' },
-  { id: 'transactions', label: 'Transactions' },
-  { id: 'customers', label: 'Customers' },
-  { id: 'reconciliation', label: 'Reconcile' },
-  { id: 'period-close', label: 'Period Close' },
-  { id: 'reports', label: 'Reports' },
-  { id: 'schedules', label: 'Schedules' },
-  { id: 'team', label: 'Team' },
-  { id: 'clients', label: 'Clients' },
-  { id: 'support', label: 'Support' },
-  { id: 'trash', label: 'Trash' },
-];
+const tabTitles: Record<string, string> = {
+  dashboard: 'Dashboard',
+  accounts: 'Chart of Accounts',
+  reclassify: 'Reclassify Entries',
+  import: 'Import Data',
+  invoices: 'Invoices',
+  transactions: 'Transactions',
+  customers: 'Customers',
+  'period-close': 'Period Close',
+  'custom-reports': 'Custom Reports',
+  budget: 'Budget',
+  reports: 'Financial Reports',
+  schedules: 'Report Schedules',
+  team: 'Team Members',
+  clients: 'Clients',
+  support: 'Support Tickets',
+  trash: 'Trash',
+  reconciliation: 'Reconciliation',
+};
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -48,17 +52,21 @@ export default function Dashboard() {
   const customerName = useCustomerStore((state) => state.customerName);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [crView, setCrView] = useState<'list' | 'builder' | 'viewer'>('list');
+  const [crReport, setCrReport] = useState<any>(null);
 
   const effectiveUserId = useMemo(() => customerUid || user?.id || '', [customerUid, user?.id]);
 
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
+    setCrView('list');
+    setCrReport(null);
     router.push({ query: { ...router.query, tab } }, undefined, { shallow: true });
   }, [router]);
 
   useEffect(() => {
     const tab = router.query.tab as string;
-    if (tab && ALL_TAB_IDS.includes(tab)) {
+    if (tab && ALL_SIDEBAR_IDS.includes(tab)) {
       setActiveTab(tab);
     }
   }, [router.query.tab]);
@@ -88,21 +96,20 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>Dashboard | BookKeep</title>
+        <title>{tabTitles[activeTab] || 'Dashboard'} | BookKeep</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <div className="py-4 sm:py-6 animate-fade-in overflow-x-hidden">
+      <div className="py-4 sm:py-6 animate-slide-up overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <DashboardHeader
-          title="Dashboard"
-          subtitle={customerUid ? `Viewing ${customerName}'s data` : `Welcome back, ${user.name || user.email}`}
-        />
-
-        <div className="hidden sm:block mb-6">
-          <GroupedTabs activeTab={activeTab} onChange={handleTabChange} />
-        </div>
-        <div className="sm:hidden mb-6">
-          <Tabs tabs={mobileTabItems} activeTab={activeTab} onChange={handleTabChange} />
+        <div className="mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-surface-900">
+            {tabTitles[activeTab] || 'Dashboard'}
+          </h1>
+          {activeTab === 'dashboard' && (
+            <p className="text-sm text-surface-500 mt-1">
+              {customerUid ? `Viewing ${customerName}'s data` : `Welcome back, ${user.name || user.email}`}
+            </p>
+          )}
         </div>
 
         {activeTab === 'dashboard' && (
@@ -160,6 +167,24 @@ export default function Dashboard() {
         {activeTab === 'period-close' && (
           <div className="animate-fade-in" key={effectiveUserId}>
             <PeriodClose userId={effectiveUserId} />
+          </div>
+        )}
+
+        {activeTab === 'custom-reports' && (
+          <div className="animate-fade-in" key={effectiveUserId}>
+            {crView === 'builder' && crReport ? (
+              <CustomReportBuilder report={crReport} userId={effectiveUserId} onSaved={() => { setCrView('list'); setCrReport(null); }} onCancel={() => { setCrView('list'); setCrReport(null); }} />
+            ) : crView === 'viewer' && crReport ? (
+              <CustomReportViewer report={crReport} userId={effectiveUserId} onBack={() => { setCrView('list'); setCrReport(null); }} />
+            ) : (
+              <CustomReportList userId={effectiveUserId} onEdit={(r) => { setCrReport(r); setCrView('builder'); }} onView={(r) => { setCrReport(r); setCrView('viewer'); }} />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'budget' && (
+          <div className="animate-fade-in" key={effectiveUserId}>
+            <BudgetPanel userId={effectiveUserId} />
           </div>
         )}
 

@@ -157,9 +157,9 @@ export default function BillingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-200">
-                  <th className="text-left py-3 pr-4 font-medium text-surface-500">Feature</th>
+                  <th scope="col" className="text-left py-3 pr-4 font-medium text-surface-500">Feature</th>
                   {data.allTiers.map((t) => (
-                    <th key={t.id} className={`text-center py-3 px-4 font-semibold ${t.id === data.tier ? 'text-primary-700' : 'text-surface-700'}`}>
+                    <th scope="col" key={t.id} className={`text-center py-3 px-4 font-semibold ${t.id === data.tier ? 'text-primary-700' : 'text-surface-700'}`}>
                       {t.label}
                       {t.id === data.tier && <span className="block text-xs text-primary-500 font-normal">Current</span>}
                     </th>

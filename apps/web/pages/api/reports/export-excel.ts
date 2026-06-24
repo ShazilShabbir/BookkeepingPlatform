@@ -3,7 +3,10 @@ import { getToken } from 'next-auth/jwt';
 import { generateWorkbook } from '@/lib/excel';
 import { checkFeatureAccess } from '@/lib/subscription';
 import { resolveUserId } from '@/lib/customerContext';
+import { rateLimit } from '@/lib/rateLimit';
 import dbConnect from '@/lib/mongoose';
+
+const exportExcelLimiter = rateLimit({ interval: 60 * 1000, max: 5 });
 import User from '@/lib/models/User';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,6 +15,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = await resolveUserId(token, req.body.userId);
+
+  const { allowed: rateAllowed } = exportExcelLimiter(uid!);
+  if (!rateAllowed) return res.status(429).json({ error: 'Too many requests. Please wait before exporting again.' });
 
   if (process.env.NODE_ENV !== 'development') {
     const { allowed } = await checkFeatureAccess(uid!, 'excel-export');

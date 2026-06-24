@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
 import Papa from 'papaparse';
@@ -134,7 +134,7 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
         const res = await fetch(`/api/customers?uid=${encodeURIComponent(customerUid)}`);
         const json = await res.json();
         if (json.success && json.data) {
-          const loadedProfiles = json.data.csvProfiles || [];
+          const loadedProfiles: { name: string; csvMapping: CsvMapping; customFields: CustomField[] }[] = json.data.csvProfiles || [];
           setProfiles(loadedProfiles);
           if (loadedProfiles.length > 0 && !selectedProfile) {
             setSelectedProfile(loadedProfiles[0].name);
@@ -144,7 +144,7 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
           }
           const initial: Record<string, string> = {};
           const cf = selectedProfile
-            ? (loadedProfiles.find((p: any) => p.name === selectedProfile)?.customFields || [])
+            ? (loadedProfiles.find((p) => p.name === selectedProfile)?.customFields || [])
             : (json.data.customFields || []);
           for (const f of cf) {
             if (f.csvColumn) initial[f.id] = f.csvColumn;
@@ -155,9 +155,15 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
     })();
   }, [customerUid, selectedProfile]);
 
+  const profileMap = useMemo(() => {
+    const map = new Map<string, { name: string; csvMapping: CsvMapping; customFields: CustomField[] }>();
+    for (const p of profiles) map.set(p.name, p);
+    return map;
+  }, [profiles]);
+
   const changeProfile = (name: string) => {
     setSelectedProfile(name);
-    const p = profiles.find(x => x.name === name);
+    const p = profileMap.get(name);
     if (p) {
       setSavedConfig({ csvMapping: p.csvMapping, customFields: p.customFields });
       const initial: Record<string, string> = {};
@@ -597,7 +603,7 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-surface-100">
-                <th className="sticky left-0 bg-surface-100 py-1.5 px-2 text-left font-medium text-surface-500 w-8">
+                <th scope="col" className="sticky left-0 bg-surface-100 py-1.5 px-2 text-left font-medium text-surface-500 w-8">
                   <input
                     type="checkbox"
                     checked={pageRows.length > 0 && pageRows.every((_, i) => excludedRows.has(start + i + 1))}
@@ -612,8 +618,8 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
                     })}
                   />
                 </th>
-                <th className="py-1.5 px-2 text-left font-medium text-surface-500 w-10">#</th>
-                {headers.map(h => <th key={h} className="py-1.5 px-2 text-left font-medium text-surface-500 whitespace-nowrap">{h}</th>)}
+                <th scope="col" className="py-1.5 px-2 text-left font-medium text-surface-500 w-10">#</th>
+                {headers.map(h => <th key={h} scope="col" className="py-1.5 px-2 text-left font-medium text-surface-500 whitespace-nowrap">{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -835,9 +841,9 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-200">
-                  <th className="text-left py-2 pr-4 font-medium text-surface-600">Bookkeeping Field</th>
-                  <th className="text-left py-2 pr-4 font-medium text-surface-600">CSV Column</th>
-                  <th className="text-left py-2 font-medium text-surface-600"></th>
+                  <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Bookkeeping Field</th>
+                  <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">CSV Column</th>
+                  <th scope="col" className="text-left py-2 font-medium text-surface-600"></th>
                 </tr>
               </thead>
               <tbody className="text-surface-700">
@@ -885,9 +891,9 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-surface-200">
-                    <th className="text-left py-2 pr-4 font-medium text-surface-600">Custom Field</th>
-                    <th className="text-left py-2 pr-4 font-medium text-surface-600">CSV Column</th>
-                    <th className="text-left py-2 font-medium text-surface-600">Sample Values</th>
+                    <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Custom Field</th>
+                    <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">CSV Column</th>
+                    <th scope="col" className="text-left py-2 font-medium text-surface-600">Sample Values</th>
                   </tr>
                 </thead>
                 <tbody className="text-surface-700">

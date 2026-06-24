@@ -141,12 +141,12 @@ export default function TeamMembers() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-200">
-                <th className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Email</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600">Role</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600">Status</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Invited</th>
-                <th className="text-left py-2 font-medium text-surface-600"></th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Email</th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Role</th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Status</th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Invited</th>
+                <th scope="col" className="text-left py-2 font-medium text-surface-600"></th>
               </tr>
             </thead>
             <tbody className="text-surface-700">

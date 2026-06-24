@@ -7,4 +7,5 @@ export { Skeleton, MetricCardSkeleton, ChartSkeleton, TableSkeleton, CardGridSke
 export { ErrorBoundary } from './ErrorBoundary';
 export { Modal } from './Modal';
 export { EmptyState } from './EmptyState';
+export { Table } from './Table';
 export { default as Accordion } from '@/components/Accordion';

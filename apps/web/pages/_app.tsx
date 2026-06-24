@@ -1,10 +1,12 @@
 import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import { SessionProvider, useSession } from 'next-auth/react';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useUserStore } from '@/lib/store';
 import Navbar from '@/components/Navbar';
 import LandingNavbar from '@/components/LandingNavbar';
+import Layout from '@/components/Layout';
+import { ALL_SIDEBAR_IDS } from '@/lib/navigation';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ui';
 
@@ -39,7 +41,24 @@ function AuthSync({ children, pathname }: { children: React.ReactNode; pathname:
 }
 
 function MyApp({ Component, pageProps: { session, ...pageProps }, router }: AppProps) {
-  const isAuthPage = ['login', 'signup'].includes(router.pathname.split('/')[1]);
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const basePath = router.pathname.split('/')[1];
+  const isAuthPage = ['login', 'signup'].includes(basePath);
+  const isLandingPage = router.pathname === '/';
+  const isAppPage = !isAuthPage && !isLandingPage && basePath !== '';
+
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab);
+  }, []);
+
+  useEffect(() => {
+    if (router.pathname !== '/dashboard') return;
+    const tab = router.query.tab as string;
+    if (tab && ALL_SIDEBAR_IDS.includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [router.query.tab, router.pathname]);
 
   useEffect(() => {
     if (GA_ID === 'G-XXXXXXXXXX') return;
@@ -67,14 +86,22 @@ function MyApp({ Component, pageProps: { session, ...pageProps }, router }: AppP
             error: { iconTheme: { primary: '#ef4444', secondary: '#f8fafc' } },
           }}
         />
-        <div className="min-h-screen flex flex-col">
-          {!isAuthPage && router.pathname === '/' ? <LandingNavbar /> : !isAuthPage && <Navbar pathname={router.pathname} />}
-          <main className="flex-1">
+        {isAppPage ? (
+          <Layout activeTab={activeTab} onTabChange={handleTabChange}>
             <ErrorBoundary>
               <Component {...pageProps} />
             </ErrorBoundary>
-          </main>
-        </div>
+          </Layout>
+        ) : (
+          <div className="min-h-screen flex flex-col">
+            {isLandingPage ? <LandingNavbar /> : (!isAuthPage && <Navbar pathname={router.pathname} />)}
+            <main className="flex-1">
+              <ErrorBoundary>
+                <Component {...pageProps} />
+              </ErrorBoundary>
+            </main>
+          </div>
+        )}
       </AuthSync>
     </SessionProvider>
   );

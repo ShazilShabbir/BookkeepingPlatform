@@ -6,11 +6,11 @@ export default function UserMenu() {
   const { data: session } = useSession();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -22,7 +22,7 @@ export default function UserMenu() {
     : user?.email?.[0]?.toUpperCase() || '?';
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={menuRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 p-2.5 sm:p-1.5 rounded-lg hover:bg-surface-100 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0"

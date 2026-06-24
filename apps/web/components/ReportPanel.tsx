@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Card, Button } from '@/components/ui';
+import { Card, Button, Tabs } from '@/components/ui';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/format';
 
@@ -42,6 +42,7 @@ export default function ReportPanel({ userId }: { userId: string }) {
   const availableViews = new Set(data ? ['all', 'pl', 'bs', ...(data.cashFlow ? ['cf'] : []), ...(data.trialBalance ? ['tb'] : [])] : ['all', 'pl', 'bs']);
   const safeView = availableViews.has(view) ? view : 'all';
   const [downloading, setDownloading] = useState(false);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
   const fetchedRef = useRef(false);
 
   const fetchData = useCallback(async () => {
@@ -66,7 +67,7 @@ export default function ReportPanel({ userId }: { userId: string }) {
     if (!fetchedRef.current) { fetchedRef.current = true; fetchData(); }
   }, [fetchData]);
 
-  const handleDownload = async () => {
+  const handleDownloadExcel = async () => {
     setDownloading(true);
     try {
       const res = await fetch('/api/reports/export-excel', {
@@ -90,6 +91,36 @@ export default function ReportPanel({ userId }: { userId: string }) {
       toast.error(err.message || 'Failed to download Excel report');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    setPdfDownloading(true);
+    try {
+      const res = await fetch('/api/reports/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, userId }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        throw new Error(body.error || 'Failed to generate PDF');
+      }
+      const binary = atob(body.pdf);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `financial-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('PDF report downloaded');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to download PDF report');
+    } finally {
+      setPdfDownloading(false);
     }
   };
 
@@ -219,7 +250,7 @@ export default function ReportPanel({ userId }: { userId: string }) {
                         <span className="text-surface-900">{item.accountName}</span>
                       </td>
                       <td className={`py-2 px-4 text-right font-mono font-medium ${item.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {item.amount >= 0 ? fmt(item.amount) : `(${fmt(Math.abs(item.amount))}`}
+                        {item.amount >= 0 ? fmt(item.amount) : `(${fmt(Math.abs(item.amount))})`}
                       </td>
                     </tr>
                   ))}
@@ -250,12 +281,12 @@ export default function ReportPanel({ userId }: { userId: string }) {
         <div className="overflow-x-auto border border-surface-200 rounded-lg">
           <table className="w-full text-sm">
             <thead><tr className="bg-surface-100">
-              <th className="py-2 px-3 text-left font-medium text-surface-600">Code</th>
-              <th className="py-2 px-3 text-left font-medium text-surface-600">Account</th>
-              <th className="py-2 px-3 text-left font-medium text-surface-600">Type</th>
-              <th className="py-2 px-3 text-right font-medium text-surface-600">Debits</th>
-              <th className="py-2 px-3 text-right font-medium text-surface-600">Credits</th>
-              <th className="py-2 px-3 text-right font-medium text-surface-600">Balance</th>
+              <th scope="col" className="py-2 px-3 text-left font-medium text-surface-600">Code</th>
+              <th scope="col" className="py-2 px-3 text-left font-medium text-surface-600">Account</th>
+              <th scope="col" className="py-2 px-3 text-left font-medium text-surface-600">Type</th>
+              <th scope="col" className="py-2 px-3 text-right font-medium text-surface-600">Debits</th>
+              <th scope="col" className="py-2 px-3 text-right font-medium text-surface-600">Credits</th>
+              <th scope="col" className="py-2 px-3 text-right font-medium text-surface-600">Balance</th>
             </tr></thead>
             <tbody>
               {trialBalance.rows.map((row, idx) => (
@@ -300,53 +331,50 @@ export default function ReportPanel({ userId }: { userId: string }) {
       default: return (
         <div className="space-y-8">
           <div><h3 className="text-base font-semibold text-surface-900 mb-4">Profit & Loss</h3>{renderPL()}</div>
-          <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Balance Sheet</h3>{renderBS()}</div>
-          {data.cashFlow && <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Cash Flow</h3>{renderCF()}</div>}
-          {data.trialBalance && <div className="border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Trial Balance</h3>{renderTB()}</div>}
+          <div className="print-break-before border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Balance Sheet</h3>{renderBS()}</div>
+          {data.cashFlow && <div className="print-break-before border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Cash Flow</h3>{renderCF()}</div>}
+          {data.trialBalance && <div className="print-break-before border-t border-surface-200 pt-8"><h3 className="text-base font-semibold text-surface-900 mb-4">Trial Balance</h3>{renderTB()}</div>}
         </div>
       );
     }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in print-report">
       <Card padding="lg">
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-3 mb-6">
-          <div className="w-full sm:w-auto">
-            <label className="block text-xs font-medium text-surface-500 mb-1">Start Date</label>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 mb-6 no-print bg-surface-50 rounded-xl p-4">
+          <div>
+            <label className="block text-xs font-medium text-surface-500 mb-1">Start</label>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="w-full sm:w-auto border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              className="w-full sm:w-40 border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500" />
           </div>
-          <div className="w-full sm:w-auto">
-            <label className="block text-xs font-medium text-surface-500 mb-1">End Date</label>
+          <div>
+            <label className="block text-xs font-medium text-surface-500 mb-1">End</label>
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              className="w-full sm:w-auto border border-surface-200 rounded-lg px-3 py-1.5 text-sm bg-white" />
+              className="w-full sm:w-40 border border-surface-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500" />
           </div>
-          <Button onClick={fetchData} loading={loading} className="w-full sm:w-auto">Run Report</Button>
-          <Button onClick={handleDownload} loading={downloading} variant="secondary" className="w-full sm:w-auto flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export Excel
+          <Button onClick={fetchData} loading={loading}>Run Report</Button>
+          <div className="w-px h-8 bg-surface-200 hidden sm:block self-center" />
+          <Button onClick={handleDownloadPdf} loading={pdfDownloading} variant="secondary" className="flex items-center gap-1.5 !px-2.5 sm:!px-3">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 14.78l-1.5 1.5a1.5 1.5 0 002.12 2.12l1.5-1.5M9 18h6M15 5.22l1.5-1.5a1.5 1.5 0 012.12 2.12l-1.5 1.5" /></svg>
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
+          <Button onClick={() => window.print()} variant="secondary" className="flex items-center gap-1.5 !px-2.5 sm:!px-3 no-print">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" /></svg>
+            <span className="hidden sm:inline">Print</span>
+          </Button>
+          <Button onClick={handleDownloadExcel} loading={downloading} variant="secondary" className="flex items-center gap-1.5 !px-2.5 sm:!px-3">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            <span className="hidden sm:inline">Excel</span>
           </Button>
         </div>
 
-        <div className="overflow-x-auto scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0 mb-6">
-          <div className="flex gap-1 border-b border-surface-200 min-w-max">
-          {tabs.filter(t => t.id === 'all' || t.id === 'pl' || t.id === 'bs' || (t.id === 'cf' && data?.cashFlow) || (t.id === 'tb' && data?.trialBalance)).map(t => (
-            <button
-              key={t.id}
-              onClick={() => setView(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                safeView === t.id
-                  ? 'border-primary-600 text-primary-700'
-                  : 'border-transparent text-surface-500 hover:text-surface-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-          </div>
+        <div className="mb-6 no-print">
+          <Tabs
+            tabs={tabs.filter(t => t.id === 'all' || t.id === 'pl' || t.id === 'bs' || (t.id === 'cf' && data?.cashFlow) || (t.id === 'tb' && data?.trialBalance))}
+            activeTab={safeView}
+            onChange={(id) => setView(id as ReportView)}
+          />
         </div>
 
         {loading ? (

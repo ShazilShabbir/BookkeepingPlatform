@@ -126,10 +126,10 @@ export default function ClientManager({ userId }: { userId: string }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-200">
-                <th className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Share Link</th>
-                <th className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Created</th>
-                <th className="text-left py-2 font-medium text-surface-600"></th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Share Link</th>
+                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Created</th>
+                <th scope="col" className="text-left py-2 font-medium text-surface-600"></th>
               </tr>
             </thead>
             <tbody className="text-surface-700">

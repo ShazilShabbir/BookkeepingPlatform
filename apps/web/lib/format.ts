@@ -12,6 +12,7 @@ const localeMap: Record<string, string> = {
 };
 
 export function formatCurrency(amount: number, currency = 'USD'): string {
+  if (typeof amount !== 'number' || isNaN(amount)) amount = 0;
   const ccy = currency.toUpperCase();
   const locale = localeMap[ccy] || 'en-US';
   try {
@@ -23,6 +24,7 @@ export function formatCurrency(amount: number, currency = 'USD'): string {
 }
 
 export function formatCurrencyCompact(amount: number, currency = 'USD'): string {
+  if (typeof amount !== 'number' || isNaN(amount)) amount = 0;
   const ccy = currency.toUpperCase();
   const sym = currencySymbols[ccy] || ccy;
   if (Math.abs(amount) >= 1_000_000) {
@@ -32,6 +34,10 @@ export function formatCurrencyCompact(amount: number, currency = 'USD'): string 
     return `${sym}${(amount / 1_000).toFixed(1)}K`;
   }
   return formatCurrency(amount, ccy);
+}
+
+export function formatNumber(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function getCurrencySymbol(currency = 'USD'): string {

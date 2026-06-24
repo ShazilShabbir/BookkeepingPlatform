@@ -23,6 +23,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { startDate, endDate } = req.query;
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate as string)) return res.status(400).json({ error: 'Invalid startDate format. Use YYYY-MM-DD.' });
+    if (endDate && !dateRegex.test(endDate as string)) return res.status(400).json({ error: 'Invalid endDate format. Use YYYY-MM-DD.' });
     const query: Record<string, any> = { userId: uid };
     if (startDate) query.date = { $gte: startDate as string };
     if (endDate) query.date = { ...query.date, $lte: endDate as string };
@@ -30,13 +33,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const entries = await JournalEntry.find(query).select('_id date').lean();
     const entryIds = entries.map(e => (e as any)._id.toString());
 
+    const entryDateMap = new Map<string, string>();
+    for (const e of entries) entryDateMap.set((e as any)._id.toString(), (e as any).date || '');
+
     const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
     const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
     const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
     for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
 
+    const cashAccountDocs = accountDocs.filter(a => a.type === 'asset' && (a.normalBalance || 'debit') === 'debit').sort((a, b) => a.code.localeCompare(b.code));
+    const cashAccountCode = cashAccountDocs.length > 0 ? cashAccountDocs[0].code : '1000';
+
     const accountTotals = new Map<string, { debits: number; credits: number }>();
     const linesByEntry = new Map<string, any[]>();
+    const monthlyAccountTotals = new Map<string, Map<string, { debits: number; credits: number }>>();
+    const dailyAccountTotals = new Map<string, Map<string, { debits: number; credits: number }>>();
+    const revenueByCategory = new Map<string, { amount: number; count: number }>();
+    const expensesByCategory = new Map<string, { amount: number; count: number }>();
     for (const line of lines) {
       const code = line.accountCode;
       if (!code) continue;
@@ -47,6 +60,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const existing = linesByEntry.get(line.journalEntryId) || [];
       existing.push(line);
       linesByEntry.set(line.journalEntryId, existing);
+
+      const entryDate = entryDateMap.get(line.journalEntryId);
+      if (entryDate) {
+        const month = entryDate.slice(0, 7);
+        if (!monthlyAccountTotals.has(month)) monthlyAccountTotals.set(month, new Map());
+        const mMap = monthlyAccountTotals.get(month)!;
+        const mTotals = mMap.get(code) || { debits: 0, credits: 0 };
+        mTotals.debits += line.debit || 0;
+        mTotals.credits += line.credit || 0;
+        mMap.set(code, mTotals);
+
+        const day = entryDate.slice(0, 10);
+        if (!dailyAccountTotals.has(day)) dailyAccountTotals.set(day, new Map());
+        const dMap = dailyAccountTotals.get(day)!;
+        const dTotals = dMap.get(code) || { debits: 0, credits: 0 };
+        dTotals.debits += line.debit || 0;
+        dTotals.credits += line.credit || 0;
+        dMap.set(code, dTotals);
+
+        const info = accountMap.get(code);
+        if (info) {
+          const balance = info.normalBalance === 'credit' ? (line.credit || 0) - (line.debit || 0) : (line.debit || 0) - (line.credit || 0);
+          if (Math.abs(balance) >= 0.01) {
+            if (info.type === 'revenue') {
+              const c = revenueByCategory.get(info.name) || { amount: 0, count: 0 };
+              c.amount += balance; c.count += 1;
+              revenueByCategory.set(info.name, c);
+            } else if (info.type === 'expense') {
+              const c = expensesByCategory.get(info.name) || { amount: 0, count: 0 };
+              c.amount += balance; c.count += 1;
+              expensesByCategory.set(info.name, c);
+            }
+          }
+        }
+      }
     }
 
     const allTypes = ['revenue', 'expense', 'asset', 'liability', 'equity'];
@@ -72,7 +120,69 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const expenseTotal = allSections.find(s => s.type === 'expense')?.total || 0;
     const netIncome = Math.round((revenueTotal - expenseTotal) * 100) / 100;
 
-    const kpis = { totalRevenue: revenueTotal, totalExpenses: expenseTotal, netProfit: netIncome, profitMargin: revenueTotal > 0 ? Math.round((netIncome / revenueTotal) * 1000) / 10 : 0, entryCount: entryIds.length };
+    const cashAcctTotals = accountTotals.get(cashAccountCode);
+    const cashInfo = accountMap.get(cashAccountCode);
+    const cashBalance = cashAcctTotals && cashInfo
+      ? Math.round(((cashInfo.normalBalance === 'credit' ? cashAcctTotals.credits - cashAcctTotals.debits : cashAcctTotals.debits - cashAcctTotals.credits)) * 100) / 100
+      : 0;
+
+    const kpis = { totalRevenue: revenueTotal, totalExpenses: expenseTotal, netProfit: netIncome, profitMargin: revenueTotal > 0 ? Math.round((netIncome / revenueTotal) * 1000) / 10 : 0, entryCount: entryIds.length, cashBalance };
+
+    const sortedMonths = Array.from(monthlyAccountTotals.keys()).sort();
+    const revenueTrend: number[] = [];
+    const expensesTrend: number[] = [];
+    const profitTrend: number[] = [];
+    for (const month of sortedMonths) {
+      const mMap = monthlyAccountTotals.get(month)!;
+      let monthRev = 0, monthExp = 0;
+      for (const [code, mt] of mMap) {
+        const info = accountMap.get(code);
+        if (!info) continue;
+        const bal = (info.normalBalance === 'credit' ? mt.credits - mt.debits : mt.debits - mt.credits);
+        if (info.type === 'revenue') monthRev += bal;
+        else if (info.type === 'expense') monthExp += bal;
+      }
+      revenueTrend.push(Math.round(monthRev * 100) / 100);
+      expensesTrend.push(Math.round(monthExp * 100) / 100);
+      profitTrend.push(Math.round((monthRev - monthExp) * 100) / 100);
+    }
+
+    const sortedDays = Array.from(dailyAccountTotals.keys()).sort();
+    const dailyMetricsList = sortedDays.map(day => {
+      const dMap = dailyAccountTotals.get(day)!;
+      let dayRev = 0, dayExp = 0;
+      for (const [code, dt] of dMap) {
+        const info = accountMap.get(code);
+        if (!info) continue;
+        const bal = (info.normalBalance === 'credit' ? dt.credits - dt.debits : dt.debits - dt.credits);
+        if (info.type === 'revenue') dayRev += bal;
+        else if (info.type === 'expense') dayExp += bal;
+      }
+      return { date: day, revenue: Math.round(dayRev * 100) / 100, expenses: Math.round(dayExp * 100) / 100, profit: Math.round((dayRev - dayExp) * 100) / 100 };
+    });
+
+    const toCatStats = (map: Map<string, { amount: number; count: number }>) => {
+      const entries = Array.from(map.entries());
+      const total = entries.reduce((sum, [, data]) => sum + Math.abs(data.amount), 0) || 1;
+      return entries.map(([category, data]) => ({
+        category, amount: Math.round(Math.abs(data.amount) * 100) / 100, count: data.count, percentage: Math.round((Math.abs(data.amount) / total) * 1000) / 10,
+      })).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+    };
+
+    const revStats = toCatStats(revenueByCategory);
+    const expStats = toCatStats(expensesByCategory);
+
+    const allCatMap = new Map(revenueByCategory);
+    for (const [name, data] of expensesByCategory) {
+      const existing = allCatMap.get(name) || { amount: 0, count: 0 };
+      existing.amount -= data.amount;
+      existing.count += data.count;
+      allCatMap.set(name, existing);
+    }
+    const catTotal = Math.abs(revenueTotal) + Math.abs(expenseTotal) || 1;
+    const topCategories = Array.from(allCatMap.entries()).map(([category, data]) => ({
+      category, amount: Math.round(data.amount * 100) / 100, count: data.count, percentage: Math.round((Math.abs(data.amount) / catTotal) * 1000) / 10,
+    })).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 10);
 
     const plSections = allSections.filter(s => ['revenue', 'expense'].includes(s.type));
     const bsSections = allSections.filter(s => ['asset', 'liability', 'equity'].includes(s.type));
@@ -87,9 +197,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let totOp = 0, totInv = 0, totFin = 0;
     for (const eid of entryIds) {
       const el = linesByEntry.get(eid) || [];
-      const cashLine = el.find(l => l.accountCode === '1000');
+      const cashLine = el.find(l => l.accountCode === cashAccountCode);
       if (!cashLine) continue;
-      for (const line of el.filter(l => l.accountCode !== '1000')) {
+      for (const line of el.filter(l => l.accountCode !== cashAccountCode)) {
         const info = accountMap.get(line.accountCode);
         if (!info) continue;
         const side = cashLine.debit > 0 ? 'debit' : 'credit';
@@ -98,7 +208,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const item = { accountCode: line.accountCode, accountName: info.name, amount };
         const code = parseInt(line.accountCode);
         if (info.type === 'revenue' || info.type === 'expense') { operating.push(item); totOp += amount; }
-        else if (code >= 1400 && code < 2000) { investing.push(item); totInv += amount; }
+        else if (!isNaN(code) && code >= 1400 && code < 2000) { investing.push(item); totInv += amount; }
         else { financing.push(item); totFin += amount; }
       }
     }
@@ -129,6 +239,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       data: {
         kpis,
+        trends: { revenue: revenueTrend, expenses: expensesTrend, profit: profitTrend },
+        topCategories,
+        revenueByCategory: revStats,
+        expensesByCategory: expStats,
+        dailyMetrics: dailyMetricsList,
         profitLoss: { sections: plSections, netIncome, netIncomeRatio: kpis.profitMargin },
         balanceSheet: { sections: bsSections, totalAssets: bsSections.find(s => s.type === 'asset')?.total || 0, totalLiabilities: bsSections.find(s => s.type === 'liability')?.total || 0, totalEquity: bsSections.find(s => s.type === 'equity')?.total || 0 },
         cashFlow,

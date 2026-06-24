@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button, Input } from '@/components/ui';
 import toast from 'react-hot-toast';
-import type { InvoiceLineItem } from '@/types/invoice';
+import type { InvoiceLineItem, InvoiceData } from '@/types/invoice';
 import { COMMON_CURRENCIES } from '@/lib/format';
 
 interface Props {
   onSuccess: () => void;
   onCancel: () => void;
-  editInvoice?: any;
+  editInvoice?: InvoiceData;
 }
 
 export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props) {
@@ -24,14 +24,19 @@ export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props)
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(editInvoice?.lineItems || [{ description: '', quantity: 1, unitPrice: 0, amount: 0 }]);
   const [sending, setSending] = useState(false);
 
-  const updateLineItem = (i: number, field: keyof InvoiceLineItem, value: any) => {
-    const items = [...lineItems];
-    (items[i] as any)[field] = value;
-    if (field === 'quantity' || field === 'unitPrice') {
-      items[i].amount = (Number(items[i].quantity) || 0) * (Number(items[i].unitPrice) || 0);
-    }
-    setLineItems(items);
-  };
+  const updateLineItem = useCallback((i: number, field: keyof InvoiceLineItem, value: string | number) => {
+    setLineItems(prev => {
+      const items = prev.map((item, idx) => {
+        if (idx !== i) return item;
+        const updated = { ...item, [field]: value };
+        if (field === 'quantity' || field === 'unitPrice') {
+          updated.amount = (Number(updated.quantity) || 0) * (Number(updated.unitPrice) || 0);
+        }
+        return updated;
+      });
+      return items;
+    });
+  }, []);
 
   const addLine = () => setLineItems([...lineItems, { description: '', quantity: 1, unitPrice: 0, amount: 0 }]);
   const removeLine = (i: number) => { if (lineItems.length > 1) setLineItems(lineItems.filter((_, idx) => idx !== i)); };
@@ -150,7 +155,7 @@ export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props)
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-1">
           <label className="text-sm font-medium text-surface-700">Tax Rate (%)</label>
-          <Input type="number" min="0" max="100" step="0.1" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
+          <Input type="number" min="0" max="100" step="0.1" value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium text-surface-700">Currency</label>

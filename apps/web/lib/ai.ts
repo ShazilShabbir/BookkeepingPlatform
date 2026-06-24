@@ -37,7 +37,7 @@ async function callAI(prompt: string): Promise<string | null> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
 
-  const doFetch = async (useJsonMode: boolean) => {
+  const doFetch = async (useJsonMode: boolean): Promise<string | null> => {
     const body: Record<string, unknown> = {
       model: MODEL,
       messages: [
@@ -60,6 +60,9 @@ async function callAI(prompt: string): Promise<string | null> {
     if (!res.ok) {
       const errText = await res.text();
       console.error(`OpenRouter error ${res.status}: ${errText.slice(0, 300)}`);
+      if (useJsonMode && (res.status === 400 || res.status === 422)) {
+        return '__JSON_MODE_FAILED__';
+      }
       return null;
     }
 
@@ -69,8 +72,10 @@ async function callAI(prompt: string): Promise<string | null> {
 
   try {
     const result = await doFetch(true);
-    if (result) return result;
-    return await doFetch(false);
+    if (result === '__JSON_MODE_FAILED__') {
+      return await doFetch(false);
+    }
+    return result;
   } catch (err) {
     console.error('OpenRouter fetch failed:', err);
     return null;
