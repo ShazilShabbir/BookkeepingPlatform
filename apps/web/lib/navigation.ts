@@ -29,5 +29,4 @@ export const ALL_SIDEBAR_IDS = [
   'import', 'transactions', 'reclassify',
   'accounts', 'budget', 'custom-reports', 'reconciliation', 'period-close',
   'invoices', 'customers', 'clients', 'team', 'support', 'trash',
-  'settings',
 ];
