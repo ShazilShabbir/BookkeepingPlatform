@@ -15,8 +15,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await dbConnect();
 
   if (req.method === 'GET') {
-    const items = await TrashItem.find({ userId: uid }).sort({ createdAt: -1 }).limit(100).lean();
-    return res.status(200).json({ success: true, data: items });
+    const { page = '1', limit = '20' } = req.query;
+    const pg = Math.max(1, parseInt(page as string) || 1);
+    const lim = Math.min(100, Math.max(1, parseInt(limit as string) || 20));
+    const skip = (pg - 1) * lim;
+    const [items, total] = await Promise.all([
+      TrashItem.find({ userId: uid }).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+      TrashItem.countDocuments({ userId: uid }),
+    ]);
+    return res.status(200).json({ success: true, data: items, total, page: pg, pages: Math.ceil(total / lim) });
   }
 
   if (req.method === 'DELETE') {

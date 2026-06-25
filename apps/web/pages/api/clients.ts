@@ -21,8 +21,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'GET') {
-    const clients = await Client.find({ userId: uid }).sort({ name: 1 }).lean();
-    return res.status(200).json({ success: true, data: clients });
+    const { page = '1', limit = '20' } = req.query;
+    const pg = Math.max(1, parseInt(page as string) || 1);
+    const lim = Math.min(100, Math.max(1, parseInt(limit as string) || 20));
+    const skip = (pg - 1) * lim;
+    const [clients, total] = await Promise.all([
+      Client.find({ userId: uid }).sort({ name: 1 }).skip(skip).limit(lim).lean(),
+      Client.countDocuments({ userId: uid }),
+    ]);
+    return res.status(200).json({ success: true, data: clients, total, page: pg, pages: Math.ceil(total / lim) });
   }
 
   if (req.method === 'POST') {

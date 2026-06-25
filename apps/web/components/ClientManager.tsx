@@ -10,6 +10,8 @@ interface Client {
   createdAt: string;
 }
 
+const PAGE_SIZE = 20;
+
 async function api(path: string, options?: RequestInit) {
   const res = await fetch(path, {
     ...options,
@@ -21,6 +23,9 @@ async function api(path: string, options?: RequestInit) {
 export default function ClientManager({ userId }: { userId: string }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [origin, setOrigin] = useState('');
@@ -31,11 +36,15 @@ export default function ClientManager({ userId }: { userId: string }) {
     }
   }, []);
 
-  const loadClients = async () => {
+  const loadClients = async (pg: number = page) => {
     setLoading(true);
     try {
-      const json = await api('/api/clients?userId=' + encodeURIComponent(userId));
-      if (json.success) setClients(json.data);
+      const json = await api(`/api/clients?userId=${encodeURIComponent(userId)}&page=${pg}&limit=${PAGE_SIZE}`);
+      if (json.success) {
+        setClients(json.data);
+        setTotal(json.total || 0);
+        setTotalPages(json.pages || 1);
+      }
     } catch {
       toast.error('Failed to load clients');
     } finally {
@@ -43,7 +52,7 @@ export default function ClientManager({ userId }: { userId: string }) {
     }
   };
 
-  useEffect(() => { loadClients(); }, [userId]);
+  useEffect(() => { loadClients(1); }, [userId]);
 
   const addClient = async () => {
     if (!name.trim()) {
@@ -59,7 +68,8 @@ export default function ClientManager({ userId }: { userId: string }) {
       if (json.success) {
         toast.success('Client created');
         setName('');
-        loadClients();
+        loadClients(1);
+        setPage(1);
       } else {
         toast.error(json.error || 'Failed to create client');
       }
@@ -122,60 +132,77 @@ export default function ClientManager({ userId }: { userId: string }) {
           description="Create your first client above to generate shareable report links."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-200">
-                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
-                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Share Link</th>
-                <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Created</th>
-                <th scope="col" className="text-left py-2 font-medium text-surface-600"></th>
-              </tr>
-            </thead>
-            <tbody className="text-surface-700">
-              {clients.map((client) => (
-                <tr key={client._id} className="border-b border-surface-100">
-                  <td className="py-2 pr-4 font-medium text-surface-900">{client.name}</td>
-                  <td className="py-2 pr-4 hidden sm:table-cell">
-                    <div className="flex items-center gap-2 max-w-xs">
-                      <code className="text-xs text-surface-400 font-mono truncate">
-                        {origin}/reports/{client.accessToken.slice(0, 20)}...
-                      </code>
-                      <button
-                        onClick={() => copyLink(client)}
-                        className="shrink-0 p-1 text-surface-400 hover:text-primary-600 transition-colors"
-                        title="Copy link"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                  <td className="py-2 pr-4 hidden md:table-cell text-xs text-surface-400">
-                    {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : '—'}
-                  </td>
-                  <td className="py-2 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => copyLink(client)} className="sm:hidden">
-                        Copy
-                      </Button>
-                      <button
-                        onClick={() => deleteClient(client)}
-                        className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
-                        title="Delete"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-200">
+                  <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600">Name</th>
+                  <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden sm:table-cell">Share Link</th>
+                  <th scope="col" className="text-left py-2 pr-4 font-medium text-surface-600 hidden md:table-cell">Created</th>
+                  <th scope="col" className="text-left py-2 font-medium text-surface-600"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="text-surface-700">
+                {clients.map((client) => (
+                  <tr key={client._id} className="border-b border-surface-100">
+                    <td className="py-2 pr-4 font-medium text-surface-900">{client.name}</td>
+                    <td className="py-2 pr-4 hidden sm:table-cell">
+                      <div className="flex items-center gap-2 max-w-xs">
+                        <code className="text-xs text-surface-400 font-mono truncate">
+                          {origin}/reports/{client.accessToken.slice(0, 20)}...
+                        </code>
+                        <button
+                          onClick={() => copyLink(client)}
+                          className="shrink-0 p-1 text-surface-400 hover:text-primary-600 transition-colors"
+                          title="Copy link"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4 hidden md:table-cell text-xs text-surface-400">
+                      {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => copyLink(client)} className="sm:hidden">
+                          Copy
+                        </Button>
+                        <button
+                          onClick={() => deleteClient(client)}
+                          className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-200">
+              <span className="text-sm text-surface-500">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="secondary" onClick={() => { setPage(p => p - 1); loadClients(page - 1); }} disabled={page <= 1}>
+                  Previous
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => { setPage(p => p + 1); loadClients(page + 1); }} disabled={page >= totalPages}>
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </Card>
   );

@@ -18,8 +18,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     await dbConnect();
 
     if (req.method === 'GET') {
-      const accounts = await Account.find({ userId: uid, isActive: true }).sort({ code: 1 }).lean();
-      return res.status(200).json({ success: true, data: accounts });
+      const { page = '1', limit = '100' } = req.query;
+      const pg = Math.max(1, parseInt(page as string) || 1);
+      const lim = Math.min(500, Math.max(1, parseInt(limit as string) || 100));
+      const skip = (pg - 1) * lim;
+      const [accounts, total] = await Promise.all([
+        Account.find({ userId: uid, isActive: true }).sort({ code: 1 }).skip(skip).limit(lim).lean(),
+        Account.countDocuments({ userId: uid, isActive: true }),
+      ]);
+      return res.status(200).json({ success: true, data: accounts, total, page: pg, pages: Math.ceil(total / lim) });
     }
 
     if (req.method === 'POST') {

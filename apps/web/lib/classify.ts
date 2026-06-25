@@ -5,23 +5,37 @@ export const KEYWORD_RULES: { keywords: string[]; code: string }[] = [
   { keywords: ['service', 'consulting', 'fee', 'hourly', 'retainer'], code: '4100' },
   { keywords: ['cogs', 'cost of goods', 'purchase', 'merchandise', 'inventory', 'product cost'], code: '5000' },
   { keywords: ['salary', 'wage', 'payroll', 'labor', 'bonus', 'commission'], code: '5100' },
-  { keywords: ['rent', 'lease', 'utility', 'electric', 'water', 'gas', 'internet', 'phone'], code: '5200' },
+  { keywords: ['rent', 'lease', 'utility', 'electric', 'water', 'internet', 'phone'], code: '5200' },
   { keywords: ['supplies', 'office', 'stationery', 'software', 'subscription fee'], code: '5300' },
   { keywords: ['marketing', 'ad', 'advertising', 'promotion', 'social media', 'seo', 'ppc'], code: '5400' },
   { keywords: ['travel', 'fuel', 'gasoline', 'mileage', 'hotel', 'lodging', 'transport'], code: '5500' },
   { keywords: ['legal', 'accounting', 'professional', 'consultant', 'notary', 'audit'], code: '5600' },
   { keywords: ['tax', 'license', 'permit', 'registration', 'duty', 'tariff'], code: '5700' },
+  { keywords: ['insurance', 'premium', 'policy'], code: '5450' },
+  { keywords: ['interest income', 'interest earned', 'bank interest'], code: '4200' },
+  { keywords: ['interest expense', 'interest paid', 'finance charge'], code: '5650' },
+  { keywords: ['bank fee', 'service charge', 'monthly fee', 'wire fee'], code: '5750' },
+  { keywords: ['depreciation', 'amortization'], code: '5850' },
+  { keywords: ['dividend', 'distribution'], code: '3200' },
 ];
 
 export function cleanDate(raw: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const d = new Date(raw + 'T00:00:00');
+    if (!isNaN(d.getTime())) return raw;
+  }
   const d = new Date(raw);
   if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   const parts = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (parts) {
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (month > 12 && day <= 12) {
+      const d3 = new Date(`${parts[3]}-${parts[2]}-${parts[1]}`);
+      if (!isNaN(d3.getTime())) return d3.toISOString().split('T')[0];
+    }
     const d2 = new Date(`${parts[3]}-${parts[1]}-${parts[2]}`);
     if (!isNaN(d2.getTime())) return d2.toISOString().split('T')[0];
-    const d3 = new Date(`${parts[3]}-${parts[2]}-${parts[1]}`);
-    if (!isNaN(d3.getTime())) return d3.toISOString().split('T')[0];
   }
   const parts2 = raw.match(/^(\d{1,2})\s([A-Za-z]{3})\s(\d{2})$/);
   if (parts2) {
@@ -52,15 +66,10 @@ export function classifyRow(
     }
   }
 
-  if (isCost) {
-    const acct = accountsByCode.get('5000');
-    if (acct) return acct;
-  }
-
   const text = `${descVal} ${catVal}`.toLowerCase();
   if (learningMappings) {
     for (const [descKey, code] of Object.entries(learningMappings)) {
-      if (text.includes(descKey.toLowerCase().slice(0, 40))) {
+      if (text.includes(descKey.toLowerCase().slice(0, 80))) {
         const acct = accountsByCode.get(code);
         if (acct) return acct;
       }
@@ -74,8 +83,8 @@ export function classifyRow(
     }
   }
 
-  const defaultCode = amountVal > 0 ? '5800' : '5900';
-  return accountsByCode.get(defaultCode) || { code: defaultCode, name: 'Uncategorized', type: amountVal > 0 ? 'revenue' : 'expense' };
+  const defaultCode = amountVal > 0 ? '5900' : '5800';
+  return accountsByCode.get(defaultCode) || { code: defaultCode, name: amountVal > 0 ? 'Uncategorized Income' : 'Other Expenses', type: amountVal > 0 ? 'revenue' : 'expense' };
 }
 
 export function accountsMapFromDocs(docs: { data(): Record<string, any> }[]): Map<string, AccountInfo> {

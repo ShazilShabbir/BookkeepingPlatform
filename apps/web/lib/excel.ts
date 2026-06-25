@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import { generateCashFlowReport } from '@/lib/reports';
 
 export interface BrandingOptions {
   logo?: string;
@@ -320,46 +321,17 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   }
 
   // ================================================================
-  // Sheet 5: Cash Flow
+  // Sheet 5: Cash Flow (unified via generateCashFlowReport)
   // ================================================================
+  const cfReport = await generateCashFlowReport(uid, startDate || null, endDate || null);
   const cf = wb.addWorksheet('Cash Flow');
   setupSheet(cf, [{ header: 'Section / Account', key: 'a', width: 48 }, { header: 'Amount', key: 'b', width: 22 }], palette.accentGreen);
 
-  const cfEntries = new Map<string, { operating: number; investing: number; financing: number }>();
-  let totOp = 0, totInv = 0, totFin = 0;
-
-  const cfLinesById = new Map<string, any[]>();
-  for (const line of allLines) {
-    const existing = cfLinesById.get(line.journalEntryId) || [];
-    existing.push(line);
-    cfLinesById.set(line.journalEntryId, existing);
-  }
-  for (const eid of entryIds) {
-    const lines = cfLinesById.get(eid) || [];
-    const cashLine = lines.find((l: any) => l.accountCode === '1000');
-    if (!cashLine) continue;
-    for (const line of lines.filter((l: any) => l.accountCode !== '1000')) {
-      const info = accountMap.get(line.accountCode);
-      if (!info) continue;
-      const side = cashLine.debit > 0 ? 'debit' : 'credit';
-      const amt = Math.round((side === 'debit' ? (line.credit || 0) : -(line.debit || 0)) * 100) / 100;
-      if (Math.abs(amt) < 0.01) continue;
-      const code = parseInt(line.accountCode);
-      const ex = cfEntries.get(line.accountCode) || { operating: 0, investing: 0, financing: 0 };
-      if (info.type === 'revenue' || info.type === 'expense') { ex.operating += amt; totOp += amt; }
-      else if (code >= 1400 && code < 2000) { ex.investing += amt; totInv += amt; }
-      else { ex.financing += amt; totFin += amt; }
-      cfEntries.set(line.accountCode, ex);
-    }
-  }
-  totOp = Math.round(totOp * 100) / 100; totInv = Math.round(totInv * 100) / 100; totFin = Math.round(totFin * 100) / 100;
-
-  const renderCF = (title: string, items: { code: string; amount: number }[], total: number) => {
+  const renderCF = (title: string, items: { accountCode: string; accountName: string; amount: number }[], total: number) => {
     const sr = cf.getRow(row); sr.getCell(1).value = title; sr.getCell(1).style = sectionStyle(palette.lightBg); sr.getCell(2).style = sectionStyle(palette.lightBg); row++;
-    items.sort((a, b) => a.code.localeCompare(b.code)).forEach((item, idx) => {
-      const info = accountMap.get(item.code);
+    items.sort((a, b) => a.accountCode.localeCompare(b.accountCode)).forEach((item, idx) => {
       const rr = cf.getRow(row);
-      rr.getCell(1).value = `  ${item.code}  ${info?.name || item.code}`;
+      rr.getCell(1).value = `  ${item.accountCode}  ${item.accountName}`;
       rr.getCell(2).value = item.amount; rr.getCell(2).numFmt = fmtCurrency; rr.getCell(2).alignment = { horizontal: 'right' };
       applyZebra(rr, idx % 2 === 1, palette.lightBg);
       row++;
@@ -370,16 +342,15 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   };
 
   row = 2;
-  renderCF('Operating Activities', Array.from(cfEntries.entries()).filter(([_, v]) => Math.abs(v.operating) >= 0.01).map(([c, v]) => ({ code: c, amount: v.operating })), totOp);
-  renderCF('Investing Activities', Array.from(cfEntries.entries()).filter(([_, v]) => Math.abs(v.investing) >= 0.01).map(([c, v]) => ({ code: c, amount: v.investing })), totInv);
-  renderCF('Financing Activities', Array.from(cfEntries.entries()).filter(([_, v]) => Math.abs(v.financing) >= 0.01).map(([c, v]) => ({ code: c, amount: v.financing })), totFin);
+  for (const section of cfReport.sections) {
+    renderCF(section.title, section.items, section.total);
+  }
 
-  const netChange = Math.round((totOp + totInv + totFin) * 100) / 100;
   const cfnr = cf.getRow(row);
   cfnr.getCell(1).value = 'Net Change in Cash';
-  cfnr.getCell(1).font = { bold: true, size: 12, color: { argb: netChange >= 0 ? palette.accentGreen : palette.accentRed } };
-  cfnr.getCell(2).value = netChange; cfnr.getCell(2).numFmt = fmtCurrency;
-  cfnr.getCell(2).font = { bold: true, size: 12, color: { argb: netChange >= 0 ? palette.accentGreen : palette.accentRed } };
+  cfnr.getCell(1).font = { bold: true, size: 12, color: { argb: cfReport.totalChange >= 0 ? palette.accentGreen : palette.accentRed } };
+  cfnr.getCell(2).value = cfReport.totalChange; cfnr.getCell(2).numFmt = fmtCurrency;
+  cfnr.getCell(2).font = { bold: true, size: 12, color: { argb: cfReport.totalChange >= 0 ? palette.accentGreen : palette.accentRed } };
   cfnr.getCell(2).alignment = { horizontal: 'right' };
 
   // ================================================================

@@ -34,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (closed) return res.status(403).json({ error: 'Cannot reclassify entries in a closed period' });
   }
 
-  const account = await Account.findOne({ userId: uid, code: newAccountCode }).lean();
+  const account = await Account.findOne({ userId: uid, code: newAccountCode }).lean() as any;
   if (!account) return res.status(400).json({ error: 'Target account not found' });
 
   const session = await mongoose.startSession();
@@ -45,6 +45,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (!line) throw new Error('Line not found');
 
     const oldCode = line.accountCode;
+    const oldAccount = await Account.findOne({ userId: uid, code: oldCode }).lean() as any;
+    if (!oldAccount) throw new Error('Original account not found');
+    if (oldAccount.type !== account.type) {
+      throw new Error(`Cannot change account type from ${oldAccount.type} to ${account.type}`);
+    }
     line.accountCode = newAccountCode;
     await line.save({ session });
 

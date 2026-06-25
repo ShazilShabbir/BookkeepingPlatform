@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Input, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
 import { getCurrencySymbol, COMMON_CURRENCIES } from '@/lib/format';
+import clsx from 'clsx';
 
 type Account = {
   _id: string;
@@ -15,6 +16,7 @@ type Account = {
 };
 
 const ACCOUNT_TYPES = [
+  { key: 'all', label: 'All', color: 'bg-surface-100 text-surface-700 border-surface-200' },
   { key: 'asset', label: 'Assets', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   { key: 'liability', label: 'Liabilities', color: 'bg-amber-50 text-amber-700 border-amber-200' },
   { key: 'equity', label: 'Equity', color: 'bg-violet-50 text-violet-700 border-violet-200' },
@@ -25,6 +27,8 @@ const ACCOUNT_TYPES = [
 const TYPE_BADGE_VARIANT: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
   asset: 'info', liability: 'warning', equity: 'primary', revenue: 'success', expense: 'danger',
 };
+
+const ITEMS_PER_TYPE_PAGE = 10;
 
 async function api(path: string, options?: RequestInit) {
   const res = await fetch(path, {
@@ -40,6 +44,8 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [activeType, setActiveType] = useState<string>('all');
+  const [typePages, setTypePages] = useState<Record<string, number>>({});
   const [showForm, setShowForm] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -57,7 +63,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
   const loadAccounts = async () => {
     setLoading(true);
     try {
-      const json = await api('/api/accounts?userId=' + encodeURIComponent(userId));
+      const json = await api('/api/accounts?userId=' + encodeURIComponent(userId) + '&limit=500');
       if (json.success) setAccounts(json.data);
       else toast.error(json.error || 'Failed to load accounts');
     } catch {
@@ -196,10 +202,18 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
     a.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const grouped = ACCOUNT_TYPES.map(t => ({
+  const grouped = ACCOUNT_TYPES.filter(t => t.key !== 'all').map(t => ({
     ...t,
     topLevel: filtered.filter(a => a.type === t.key && !a.parentCode),
   }));
+
+  const visibleGroups = activeType === 'all'
+    ? grouped
+    : grouped.filter(g => g.key === activeType);
+
+  const setPage = (typeKey: string, page: number) => {
+    setTypePages(prev => ({ ...prev, [typeKey]: page }));
+  };
 
   const renderAccountRow = (account: Account, depth: number = 0) => {
     const kids = childrenOf(account.code).filter(c => filtered.includes(c));
@@ -315,7 +329,7 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
                 <label className="block text-sm font-medium text-surface-700">Type</label>
                 <select value={formType} onChange={(e) => { setFormType(e.target.value as Account['type']); setFormParent(''); }}
                   className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2.5 text-sm text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500">
-                  {ACCOUNT_TYPES.map((t) => (<option key={t.key} value={t.key}>{t.label}</option>))}
+                  {ACCOUNT_TYPES.filter(t => t.key !== 'all').map((t) => (<option key={t.key} value={t.key}>{t.label}</option>))}
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -354,6 +368,27 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
           </div>
         )}
 
+        {/* Type Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {ACCOUNT_TYPES.map((t) => {
+            const count = t.key === 'all'
+              ? filtered.length
+              : filtered.filter(a => a.type === t.key).length;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setActiveType(t.key)}
+                className={clsx(
+                  'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap',
+                  activeType === t.key ? t.color : 'bg-white text-surface-500 border-surface-200 hover:border-surface-300',
+                )}
+              >
+                {t.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         {loading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (<div key={i} className="h-12 bg-surface-100 animate-pulse rounded-lg" />))}
@@ -364,17 +399,43 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
           </div>
         ) : (
           <div className="space-y-6">
-            {grouped.map((group) => {
+            {visibleGroups.map((group) => {
               const visibleTopLevel = group.topLevel.filter(a => filtered.includes(a));
               if (visibleTopLevel.length === 0) return null;
+              const page = typePages[group.key] || 1;
+              const totalPages = Math.ceil(visibleTopLevel.length / ITEMS_PER_TYPE_PAGE);
+              const paged = visibleTopLevel.slice((page - 1) * ITEMS_PER_TYPE_PAGE, page * ITEMS_PER_TYPE_PAGE);
               return (
                 <div key={group.key}>
                   <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold border mb-3 ${group.color}`}>
                     {group.label}
                   </div>
                   <div className="space-y-1">
-                    {visibleTopLevel.map(account => renderAccountRow(account))}
+                    {paged.map(account => renderAccountRow(account))}
                   </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-surface-100">
+                      <span className="text-xs text-surface-400">
+                        {(page - 1) * ITEMS_PER_TYPE_PAGE + 1}–{Math.min(page * ITEMS_PER_TYPE_PAGE, visibleTopLevel.length)} of {visibleTopLevel.length}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPage(group.key, page - 1)}
+                          disabled={page <= 1}
+                          className="px-3 py-1 text-xs font-medium rounded border border-surface-200 text-surface-600 hover:bg-surface-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setPage(group.key, page + 1)}
+                          disabled={page >= totalPages}
+                          className="px-3 py-1 text-xs font-medium rounded border border-surface-200 text-surface-600 hover:bg-surface-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

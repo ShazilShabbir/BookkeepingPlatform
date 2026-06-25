@@ -6,6 +6,7 @@ import { useUserStore } from '@/lib/store';
 import Navbar from '@/components/Navbar';
 import LandingNavbar from '@/components/LandingNavbar';
 import Layout from '@/components/Layout';
+import ImpersonationBanner from '@/components/admin/ImpersonationBanner';
 import { ALL_SIDEBAR_IDS } from '@/lib/navigation';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ui';
@@ -26,7 +27,7 @@ function AuthSync({ children, pathname }: { children: React.ReactNode; pathname:
         id: session.user.id,
         email: session.user.email || '',
         name: session.user.name || '',
-        role: 'admin',
+        role: (session.user as any).role || 'admin',
         companyName: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -86,6 +87,7 @@ function MyApp({ Component, pageProps: { session, ...pageProps }, router }: AppP
             error: { iconTheme: { primary: '#ef4444', secondary: '#f8fafc' } },
           }}
         />
+        <ImpersonationBanner />
         {isAppPage ? (
           <Layout activeTab={activeTab} onTabChange={handleTabChange}>
             <ErrorBoundary>

@@ -23,8 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (edParam) dateFilter.$lte = edParam;
     } else {
       const monthsBack = parseInt((months as string) || '12');
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - monthsBack);
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
       dateFilter.$gte = startDate.toISOString().slice(0, 10);
     }
 

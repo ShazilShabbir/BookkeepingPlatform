@@ -30,7 +30,7 @@ const UserSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   name: { type: String, required: true, trim: true },
   password: { type: String, required: true },
-  role: { type: String, default: 'admin', enum: ['admin', 'customer', 'client', 'viewer'] },
+  role: { type: String, default: 'admin', enum: ['superadmin', 'admin', 'customer', 'client', 'viewer'] },
   companyName: { type: String, default: '' },
   createdBy: { type: String, default: '' },
   csvMapping: { type: Schema.Types.Mixed, default: {} },

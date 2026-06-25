@@ -185,7 +185,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }
 
-      const dedupCache = new Map<string, string[]>();
+      const dedupCache = new Map<string, { desc: string; amount: number }[]>();
       const entriesToInsert: any[] = [];
       const linesToInsert: any[] = [];
 
@@ -197,30 +197,44 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (excludedSet.has(absRow)) { skippedRows++; continue; }
 
         const today = new Date().toISOString().split('T')[0];
-        const dateVal = dateCol ? (cleanDate(row[dateCol] || '') || today) : today;
+        const rawDate = dateCol ? (row[dateCol] || '') : '';
+        const dateVal = dateCol ? (cleanDate(rawDate) || today) : today;
+        if (rawDate && !/^\d{4}-\d{2}-\d{2}$/.test(dateVal) && dateVal !== today) {
+          errors.push({ row: absRow, reason: `Invalid date format: "${rawDate}". Expected YYYY-MM-DD.` });
+          skippedRows++; continue;
+        }
         const descVal = descCol ? (row[descCol] || '').trim() : '';
         const catCol = mapping.categoryColumn;
         const catVal = (catCol ? (row[catCol] || '') : '').trim().toLowerCase() || 'uncategorized';
 
-        const { revenueAmount, expenseAmount } = parseAmounts(row, amountCol, costCol, amountMode);
+        const { revenueAmount: revRaw, expenseAmount: expRaw } = parseAmounts(row, amountCol, costCol, amountMode);
+        const revenueAmount = Math.round(revRaw * 100) / 100;
+        const expenseAmount = Math.round(expRaw * 100) / 100;
         if (!revenueAmount && !expenseAmount) { skippedRows++; continue; }
 
         if (dedupEnabled && descVal && dateVal) {
-          let existing: string[] = [];
+          let existing: { desc: string; amount: number }[] = [];
           if (dedupCache.has(dateVal)) {
             existing = dedupCache.get(dateVal)!;
           } else {
             const entryDocs: any[] = await JournalEntry.find({ userId: uid, date: dateVal }, { description: 1 }).lean() as any[];
             const entryIds = entryDocs.map(e => e._id.toString());
-            const lineDocs: any[] = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }, { description: 1 }).lean() as any[];
-            const descs = [...entryDocs.map(e => e.description), ...lineDocs.map(l => l.description || '')];
-            existing = descs.map(d => d.toLowerCase()).filter(Boolean);
+            const lineDocs: any[] = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }, { description: 1, debit: 1, credit: 1 }).lean() as any[];
+            const descs = [
+              ...entryDocs.map(e => ({ desc: e.description, amount: 0 })),
+              ...lineDocs.map(l => ({ desc: l.description || '', amount: (l.debit || 0) - (l.credit || 0) })),
+            ];
+            existing = descs.map(d => ({ desc: d.desc.toLowerCase(), amount: d.amount })).filter(d => d.desc);
             dedupCache.set(dateVal, existing);
           }
-          const matchedDesc = existing.find((ex: string) => similarity(descVal.toLowerCase(), ex) >= DEDUP_THRESHOLD);
+          const matchedDesc = existing.find((ex) => {
+            const descMatch = similarity(descVal.toLowerCase(), ex.desc) >= DEDUP_THRESHOLD;
+            const amountMatch = Math.abs(ex.amount - revenueAmount + expenseAmount) < 0.50;
+            return descMatch && amountMatch;
+          });
           if (matchedDesc) {
             duplicatesSkipped++; skippedRows++;
-            if (duplicateRows.length < 100) duplicateRows.push({ row: absRow, description: descVal.slice(0, 100), date: dateVal, matchedDescription: matchedDesc.slice(0, 100) });
+            if (duplicateRows.length < 100) duplicateRows.push({ row: absRow, description: descVal.slice(0, 100), date: dateVal, matchedDescription: matchedDesc.desc.slice(0, 100) });
             continue;
           }
         }

@@ -37,35 +37,84 @@ export interface FinancialStatements {
   dateRange: { start: string | null; end: string | null };
 }
 
+export interface CashFlowItem {
+  accountCode: string;
+  accountName: string;
+  amount: number;
+}
+
+export interface CashFlowSection {
+  title: string;
+  items: CashFlowItem[];
+  total: number;
+}
+
+export interface CashFlowReport {
+  sections: CashFlowSection[];
+  totalChange: number;
+}
+
+function defaultNormalBalance(type: string): string {
+  return ['revenue', 'liability', 'equity'].includes(type) ? 'credit' : 'debit';
+}
+
 export async function getFinancialStatements(
   userId: string,
   startDate?: string | null,
   endDate?: string | null,
 ): Promise<FinancialStatements> {
-  await dbConnect();
-
-  const query: Record<string, any> = { userId };
-  if (startDate) query.date = { $gte: startDate };
-  if (endDate) query.date = { ...query.date, $lte: endDate };
-
-  const entries = await JournalEntry.find(query).select('_id').lean();
-  const entryIds = entries.map(e => (e as any)._id.toString());
-
-  const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId }).lean();
-  const accountTotals = new Map<string, { debits: number; credits: number }>();
-  for (const line of lines) {
-    const code = line.accountCode;
-    if (!code) continue;
-    const totals = accountTotals.get(code) || { debits: 0, credits: 0 };
-    totals.debits += line.debit || 0;
-    totals.credits += line.credit || 0;
-    accountTotals.set(code, totals);
+  if (startDate && endDate && startDate > endDate) {
+    throw new Error('Start date must be before end date');
   }
+
+  await dbConnect();
 
   const accountDocs = await Account.find({ userId, isActive: true }).lean();
   const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
   for (const a of accountDocs) {
-    accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
+    accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || defaultNormalBalance(a.type) });
+  }
+
+  const bsTypes = new Set(['asset', 'liability', 'equity']);
+  const plTypes = new Set(['revenue', 'expense']);
+
+  // P&L: date-filtered entries
+  const plQuery: Record<string, any> = { userId };
+  if (startDate) plQuery.date = { $gte: startDate };
+  if (endDate) plQuery.date = { ...plQuery.date, $lte: endDate };
+  const plEntries = await JournalEntry.find(plQuery).select('_id').lean();
+  const plEntryIds = plEntries.map(e => (e as any)._id.toString());
+  const plLines = await JournalLine.find({ journalEntryId: { $in: plEntryIds }, userId }).lean();
+
+  const plTotals = new Map<string, { debits: number; credits: number }>();
+  for (const line of plLines) {
+    const code = line.accountCode;
+    if (!code || !accountMap.has(code)) continue;
+    const info = accountMap.get(code)!;
+    if (!plTypes.has(info.type)) continue;
+    const totals = plTotals.get(code) || { debits: 0, credits: 0 };
+    totals.debits += line.debit || 0;
+    totals.credits += line.credit || 0;
+    plTotals.set(code, totals);
+  }
+
+  // BS: ALL entries up to endDate (cumulative)
+  const bsQuery: Record<string, any> = { userId };
+  if (endDate) bsQuery.date = { $lte: endDate };
+  const bsEntries = await JournalEntry.find(bsQuery).select('_id').lean();
+  const bsEntryIds = bsEntries.map(e => (e as any)._id.toString());
+  const bsLines = await JournalLine.find({ journalEntryId: { $in: bsEntryIds }, userId }).lean();
+
+  const bsTotals = new Map<string, { debits: number; credits: number }>();
+  for (const line of bsLines) {
+    const code = line.accountCode;
+    if (!code || !accountMap.has(code)) continue;
+    const info = accountMap.get(code)!;
+    if (!bsTypes.has(info.type)) continue;
+    const totals = bsTotals.get(code) || { debits: 0, credits: 0 };
+    totals.debits += line.debit || 0;
+    totals.credits += line.credit || 0;
+    bsTotals.set(code, totals);
   }
 
   const allTypes = ['revenue', 'expense', 'asset', 'liability', 'equity'];
@@ -74,41 +123,39 @@ export async function getFinancialStatements(
     asset: 'Assets', liability: 'Liabilities', equity: 'Equity',
   };
 
-  const allSections: StatementSection[] = [];
-  for (const accountType of allTypes) {
-    const accounts: AccountBalanceDetail[] = [];
-    for (const [code, totals] of accountTotals) {
-      const info = accountMap.get(code);
-      if (!info || info.type !== accountType) continue;
-      const normalBalance = info.normalBalance === 'credit' ? 'credit' : 'debit';
-      const balance = normalBalance === 'credit'
-        ? totals.credits - totals.debits
-        : totals.debits - totals.credits;
-      if (Math.abs(balance) < 0.01) continue;
-      accounts.push({
-        accountCode: code,
-        accountName: info.name,
-        balance: Math.round(balance * 100) / 100,
+  const buildSections = (types: string[], totals: Map<string, { debits: number; credits: number }>): StatementSection[] => {
+    const sections: StatementSection[] = [];
+    for (const accountType of types) {
+      const accounts: AccountBalanceDetail[] = [];
+      for (const [code, t] of totals) {
+        const info = accountMap.get(code);
+        if (!info || info.type !== accountType) continue;
+        const nb = info.normalBalance || defaultNormalBalance(accountType);
+        const balance = nb === 'credit' ? t.credits - t.debits : t.debits - t.credits;
+        if (Math.abs(balance) < 0.01) continue;
+        accounts.push({
+          accountCode: code,
+          accountName: info.name,
+          balance: Math.round(balance * 100) / 100,
+        });
+      }
+      accounts.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+      const sectionTotal = accounts.reduce((sum, a) => sum + a.balance, 0);
+      sections.push({
+        title: typeLabels[accountType] || accountType,
+        type: accountType,
+        total: Math.round(sectionTotal * 100) / 100,
+        accounts,
       });
     }
-    accounts.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
-    const sectionTotal = accounts.reduce((sum, a) => sum + a.balance, 0);
-    allSections.push({
-      title: typeLabels[accountType] || accountType,
-      type: accountType,
-      total: Math.round(sectionTotal * 100) / 100,
-      accounts,
-    });
-  }
+    return sections;
+  };
 
-  const plSections = ['revenue', 'expense'];
-  const bsSections = ['asset', 'liability', 'equity'];
+  const plResult = buildSections(['revenue', 'expense'], plTotals);
+  const bsResult = buildSections(['asset', 'liability', 'equity'], bsTotals);
 
-  const plResult = allSections.filter(s => plSections.includes(s.type));
-  const bsResult = allSections.filter(s => bsSections.includes(s.type));
-
-  const revenueTotal = allSections.find(s => s.type === 'revenue')?.total || 0;
-  const expenseTotal = allSections.find(s => s.type === 'expense')?.total || 0;
+  const revenueTotal = plResult.find(s => s.type === 'revenue')?.total || 0;
+  const expenseTotal = plResult.find(s => s.type === 'expense')?.total || 0;
   const netIncome = Math.round((revenueTotal - expenseTotal) * 100) / 100;
 
   if (netIncome !== 0) {
@@ -140,6 +187,63 @@ export async function getFinancialStatements(
       totalEquity,
     },
     dateRange: { start: startDate || null, end: endDate || null },
+  };
+}
+
+export async function generateCashFlowReport(
+  userId: string,
+  startDate?: string | null,
+  endDate?: string | null,
+): Promise<CashFlowReport> {
+  await dbConnect();
+
+  const query: Record<string, any> = { userId };
+  if (startDate) query.date = { $gte: startDate };
+  if (endDate) query.date = { ...query.date, $lte: endDate };
+
+  const entries = await JournalEntry.find(query).select('_id').lean();
+  const entryIds = entries.map(e => (e as any)._id.toString());
+
+  const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId }).lean();
+  const accountDocs = await Account.find({ userId, isActive: true }).lean();
+  const accountMap = new Map<string, { name: string; type: string }>();
+  for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type });
+
+  const linesByEntry = new Map<string, any[]>();
+  for (const line of lines) {
+    const existing = linesByEntry.get(line.journalEntryId) || [];
+    existing.push(line);
+    linesByEntry.set(line.journalEntryId, existing);
+  }
+
+  const operating: CashFlowItem[] = [], investing: CashFlowItem[] = [], financing: CashFlowItem[] = [];
+  let totOp = 0, totInv = 0, totFin = 0;
+
+  for (const eid of entryIds) {
+    const entryLines = linesByEntry.get(eid) || [];
+    const cashLine = entryLines.find(l => l.accountCode === '1000');
+    if (!cashLine) continue;
+    for (const line of entryLines.filter(l => l.accountCode !== '1000')) {
+      const info = accountMap.get(line.accountCode);
+      if (!info) continue;
+      const side = cashLine.debit > 0 ? 'debit' : 'credit';
+      const amount = Math.round((side === 'debit' ? (line.credit || 0) : -(line.debit || 0)) * 100) / 100;
+      if (Math.abs(amount) < 0.01) continue;
+      const item: CashFlowItem = { accountCode: line.accountCode, accountName: info.name, amount };
+      const code = parseInt(line.accountCode);
+      if (info.type === 'revenue' || info.type === 'expense') { operating.push(item); totOp += amount; }
+      else if (code >= 1400 && code < 2000) { investing.push(item); totInv += amount; }
+      else { financing.push(item); totFin += amount; }
+    }
+  }
+
+  return {
+    sections: [
+      { title: 'Operating Activities', items: operating, total: Math.round(totOp * 100) / 100 },
+      { title: 'Investing Activities', items: investing, total: Math.round(totInv * 100) / 100 },
+      { title: 'Financing Activities', items: financing, total: Math.round(totFin * 100) / 100 },
+    ],
+    totalChange: Math.round((totOp + totInv + totFin) * 100) / 100,
   };
 }
 

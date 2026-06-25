@@ -11,6 +11,8 @@ type Customer = {
   createdAt: string;
 };
 
+const PAGE_SIZE = 20;
+
 async function api(path: string, options?: RequestInit) {
   const res = await fetch(path, {
     ...options,
@@ -22,17 +24,24 @@ async function api(path: string, options?: RequestInit) {
 export default function ManageCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [configuringUid, setConfiguringUid] = useState<string | null>(null);
   const { setCustomer } = useCustomerStore();
 
-  const loadCustomers = async () => {
+  const loadCustomers = async (pg: number = page) => {
     setLoading(true);
     try {
-      const json = await api('/api/customers');
-      if (json.success) setCustomers(json.data);
+      const json = await api(`/api/customers?page=${pg}&limit=${PAGE_SIZE}`);
+      if (json.success) {
+        setCustomers(json.data);
+        setTotal(json.total || 0);
+        setTotalPages(json.pages || 1);
+      }
     } catch {
       toast.error('Failed to load customers');
     } finally {
@@ -40,7 +49,7 @@ export default function ManageCustomers() {
     }
   };
 
-  useEffect(() => { loadCustomers(); }, []);
+  useEffect(() => { loadCustomers(1); }, []);
 
   const addCustomer = async () => {
     if (!name.trim() || !email.trim()) {
@@ -57,7 +66,8 @@ export default function ManageCustomers() {
         toast.success('Customer created');
         setName('');
         setEmail('');
-        loadCustomers();
+        loadCustomers(1);
+        setPage(1);
       } else {
         toast.error(json.error || 'Failed to create customer');
       }
@@ -125,33 +135,50 @@ export default function ManageCustomers() {
             description="Create your first customer above. Each customer gets isolated data storage."
           />
         ) : (
-          <div className="space-y-3">
-            {customers.map((customer) => (
-              <div key={customer.uid} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-surface-900 truncate">{customer.name}</p>
-                  <p className="text-xs text-surface-400 truncate">{customer.email}</p>
+          <>
+            <div className="space-y-3">
+              {customers.map((customer) => (
+                <div key={customer.uid} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-surface-900 truncate">{customer.name}</p>
+                    <p className="text-xs text-surface-400 truncate">{customer.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <Button size="sm" variant="secondary" onClick={() => switchToCustomer(customer)}>
+                      View Data
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setConfiguringUid(customer.uid)}>
+                      Fields
+                    </Button>
+                    <button
+                      onClick={() => deleteCustomer(customer)}
+                      className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
+                      title="Delete"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 ml-4">
-                  <Button size="sm" variant="secondary" onClick={() => switchToCustomer(customer)}>
-                    View Data
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-200">
+                <span className="text-sm text-surface-500">
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => { setPage(p => p - 1); loadCustomers(page - 1); }} disabled={page <= 1}>
+                    Previous
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => setConfiguringUid(customer.uid)}>
-                    Fields
+                  <Button size="sm" variant="secondary" onClick={() => { setPage(p => p + 1); loadCustomers(page + 1); }} disabled={page >= totalPages}>
+                    Next
                   </Button>
-                  <button
-                    onClick={() => deleteCustomer(customer)}
-                    className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
-                    title="Delete"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </Card>
     </div>

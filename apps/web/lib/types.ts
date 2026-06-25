@@ -8,7 +8,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'client' | 'viewer';
+  role: 'superadmin' | 'admin' | 'client' | 'viewer';
   companyName: string;
   branding?: BrandingOptions;
   createdAt: string;

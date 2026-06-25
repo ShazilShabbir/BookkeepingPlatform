@@ -178,7 +178,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
   };
 
   const loadMore = () => {
-    if (hasMore && !loading) doSearch(true);
+    if (hasMore && !loading && entries.length < 200) doSearch(true);
   };
 
   const clearFilters = () => {
@@ -425,11 +425,16 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
             ))}
           </div>
 
-          {hasMore && (
+          {hasMore && entries.length < 200 && (
             <div className="text-center mt-6">
               <Button type="button" variant="secondary" onClick={loadMore} disabled={loading}>
                 {loading ? 'Loading...' : 'Load More'}
               </Button>
+            </div>
+          )}
+          {entries.length >= 200 && hasMore && (
+            <div className="text-center mt-6">
+              <p className="text-sm text-surface-500">Showing 200 of {total} results. Narrow your search to see more specific results.</p>
             </div>
           )}
         </div>

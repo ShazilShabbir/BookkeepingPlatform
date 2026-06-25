@@ -38,14 +38,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
-      const customers = await User.find({ createdBy: uid, role: 'customer' }).sort({ name: 1 }).lean();
+      const { page = '1', limit = '50' } = req.query;
+      const pg = Math.max(1, parseInt(page as string) || 1);
+      const lim = Math.min(100, Math.max(1, parseInt(limit as string) || 50));
+      const skip = (pg - 1) * lim;
+      const [customers, total] = await Promise.all([
+        User.find({ createdBy: uid, role: 'customer' }).sort({ name: 1 }).skip(skip).limit(lim).lean(),
+        User.countDocuments({ createdBy: uid, role: 'customer' }),
+      ]);
       const mapped = customers.map(c => ({
         uid: (c as any)._id.toString(),
         email: c.email || '',
         name: c.name || '',
         createdAt: c.createdAt?.toISOString() || '',
       }));
-      return res.status(200).json({ success: true, data: mapped });
+      return res.status(200).json({ success: true, data: mapped, total, page: pg, pages: Math.ceil(total / lim) });
     }
 
     if (req.method === 'POST') {

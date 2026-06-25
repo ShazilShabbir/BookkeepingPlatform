@@ -20,16 +20,25 @@ const resourceLabels: Record<string, string> = {
   schedule: 'Schedule',
 };
 
+const PAGE_SIZE = 20;
+
 export default function TrashPanel({ userId }: { userId: string }) {
   const [items, setItems] = useState<TrashItemData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const loadTrash = async () => {
+  const loadTrash = async (pg: number = page) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/trash?userId=' + encodeURIComponent(userId));
+      const res = await fetch(`/api/trash?userId=${encodeURIComponent(userId)}&page=${pg}&limit=${PAGE_SIZE}`);
       const json = await res.json();
-      if (json.success) setItems(json.data);
+      if (json.success) {
+        setItems(json.data);
+        setTotal(json.total || 0);
+        setTotalPages(json.pages || 1);
+      }
     } catch {
       toast.error('Failed to load trash');
     } finally {
@@ -37,7 +46,7 @@ export default function TrashPanel({ userId }: { userId: string }) {
     }
   };
 
-  useEffect(() => { loadTrash(); }, []);
+  useEffect(() => { loadTrash(1); }, []);
 
   const deletePermanently = async (id: string) => {
     try {
@@ -45,7 +54,7 @@ export default function TrashPanel({ userId }: { userId: string }) {
       const json = await res.json();
       if (json.success) {
         toast.success('Deleted permanently');
-        setItems(prev => prev.filter(i => i._id !== id));
+        loadTrash();
       } else {
         toast.error(json.error || 'Failed to delete');
       }
@@ -79,30 +88,47 @@ export default function TrashPanel({ userId }: { userId: string }) {
             description="Deleted items appear here and are kept for 30 days."
           />
         ) : (
-          <div className="space-y-2">
-            {items.map(item => (
-              <div key={item._id} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-surface-400 uppercase tracking-wider">
-                      {resourceLabels[item.resource] || item.resource}
-                    </span>
+          <>
+            <div className="space-y-2">
+              {items.map(item => (
+                <div key={item._id} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-surface-400 uppercase tracking-wider">
+                        {resourceLabels[item.resource] || item.resource}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-surface-900 truncate mt-0.5">{item.label || '(no label)'}</p>
+                    <p className="text-xs text-surface-400">Deleted {formatDate(item.createdAt)}</p>
                   </div>
-                  <p className="text-sm font-medium text-surface-900 truncate mt-0.5">{item.label || '(no label)'}</p>
-                  <p className="text-xs text-surface-400">Deleted {formatDate(item.createdAt)}</p>
+                  <button
+                    onClick={() => deletePermanently(item._id)}
+                    className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors shrink-0 ml-4 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
+                    title="Delete permanently"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  onClick={() => deletePermanently(item._id)}
-                  className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors shrink-0 ml-4 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
-                  title="Delete permanently"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-200">
+                <span className="text-sm text-surface-500">
+                  {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => { setPage(p => p - 1); loadTrash(page - 1); }} disabled={page <= 1}>
+                    Previous
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => { setPage(p => p + 1); loadTrash(page + 1); }} disabled={page >= totalPages}>
+                    Next
+                  </Button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </Card>
     </div>
