@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, FormEvent } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { Card, Button, Input } from '@/components/ui';
 import toast from 'react-hot-toast';
 import Head from 'next/head';
@@ -58,6 +58,10 @@ export default function SettingsPage() {
   const [newRate, setNewRate] = useState('');
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [rateSaving, setRateSaving] = useState(false);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -321,6 +325,28 @@ export default function SettingsPage() {
       toast.error('Something went wrong');
     } finally {
       setDisablingTotp(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error('Type DELETE to confirm');
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/user/delete', { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Account deleted successfully');
+        signOut({ callbackUrl: '/' });
+      } else {
+        toast.error(json.error || 'Failed to delete account');
+      }
+    } catch {
+      toast.error('Something went wrong');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -628,8 +654,50 @@ export default function SettingsPage() {
             <Card padding="lg">
               <h2 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h2>
               <p className="text-sm text-surface-500 mb-4">Permanently delete your account and all associated data. This action cannot be undone.</p>
-              <Button variant="danger">Delete Account</Button>
+              <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete Account</Button>
             </Card>
+          )}
+
+          {showDeleteModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+                <h3 className="text-lg font-semibold text-red-600 mb-2">Delete Account</h3>
+                <p className="text-sm text-surface-500 mb-4">
+                  This will permanently delete your account and all associated data including:
+                </p>
+                <ul className="text-sm text-surface-500 mb-4 list-disc list-inside space-y-1">
+                  <li>All journal entries and financial data</li>
+                  <li>Invoices, customers, and client records</li>
+                  <li>Settings and preferences</li>
+                </ul>
+                <p className="text-sm text-surface-500 mb-4">
+                  Type <strong>DELETE</strong> to confirm:
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type DELETE"
+                  className="w-full rounded-lg border border-surface-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 mb-4"
+                />
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="danger"
+                    onClick={handleDeleteAccount}
+                    loading={deleting}
+                    disabled={deleteConfirmText !== 'DELETE'}
+                  >
+                    Delete Account
+                  </Button>
+                  <button
+                    onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+                    className="px-4 py-2 text-sm text-surface-500 hover:text-surface-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

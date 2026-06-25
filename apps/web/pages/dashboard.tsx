@@ -21,6 +21,8 @@ import BudgetPanel from '@/components/BudgetPanel';
 import CustomReportList from '@/components/CustomReportList';
 import CustomReportBuilder from '@/components/CustomReportBuilder';
 import CustomReportViewer from '@/components/CustomReportViewer';
+import OnboardingChecklist from '@/components/OnboardingChecklist';
+import SetupWizard from '@/components/SetupWizard';
 
 import Head from 'next/head';
 import { ALL_SIDEBAR_IDS } from '@/lib/navigation';
@@ -54,6 +56,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [crView, setCrView] = useState<'list' | 'builder' | 'viewer'>('list');
   const [crReport, setCrReport] = useState<any>(null);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   const effectiveUserId = useMemo(() => customerUid || user?.id || '', [customerUid, user?.id]);
 
@@ -76,6 +79,13 @@ export default function Dashboard() {
       router.push('/login');
     }
   }, [status, router]);
+
+  useEffect(() => {
+    const setupCompleted = localStorage.getItem('bookkeep_setup_completed');
+    if (!setupCompleted && status === 'authenticated') {
+      setShowSetupWizard(true);
+    }
+  }, [status]);
 
   if (status === 'loading') {
     return (
@@ -114,6 +124,7 @@ export default function Dashboard() {
 
         {activeTab === 'dashboard' && (
           <div className="animate-fade-in" key={effectiveUserId}>
+            {!customerUid && <OnboardingChecklist />}
             <UnifiedDashboard userId={effectiveUserId} />
           </div>
         )}
@@ -235,7 +246,10 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+      {showSetupWizard && (
+        <SetupWizard onComplete={() => setShowSetupWizard(false)} />
+      )}
     </>
   );
 }

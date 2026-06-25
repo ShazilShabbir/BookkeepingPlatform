@@ -5,6 +5,8 @@ import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 import BottomNav from '@/components/BottomNav';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import GlobalSearch from '@/components/GlobalSearch';
+import CookieConsent from '@/components/CookieConsent';
 import { BreadcrumbItem, tabLabels, ALL_SIDEBAR_IDS } from '@/lib/navigation';
 
 interface LayoutProps {
@@ -51,6 +53,13 @@ export default function Layout({ children, activeTab: externalTab, onTabChange, 
 
   return (
     <div className="h-screen overflow-hidden bg-surface-50">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary-600 focus:text-white focus:rounded-lg focus:text-sm focus:font-medium"
+      >
+        Skip to content
+      </a>
+
       <Sidebar
         activeTab={activeTab}
         collapsed={sidebarCollapsed}
@@ -71,7 +80,7 @@ export default function Layout({ children, activeTab: externalTab, onTabChange, 
           breadcrumb={computedBreadcrumb}
         />
 
-        <main className="flex-1 overflow-y-auto pb-[var(--bottomnav-height)] lg:pb-0">
+        <main id="main-content" className="flex-1 overflow-y-auto pb-[var(--bottomnav-height)] lg:pb-0">
           <div className="sm:hidden px-4 pt-3">
             <Breadcrumbs items={computedBreadcrumb} />
           </div>
@@ -80,6 +89,8 @@ export default function Layout({ children, activeTab: externalTab, onTabChange, 
       </div>
 
       <BottomNav activeTab={activeTab} onChange={handleTabChange} />
+      <GlobalSearch />
+      <CookieConsent />
     </div>
   );
 }

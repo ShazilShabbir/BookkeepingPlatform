@@ -24,6 +24,8 @@ export interface IUser extends Document {
   brandingLogo?: string;
   brandingPrimaryColor?: string;
   brandingCompanyName?: string;
+  resetToken?: string;
+  resetTokenExpiry?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -49,6 +51,8 @@ const UserSchema = new Schema<IUser>({
   brandingLogo: { type: String, default: '' },
   brandingPrimaryColor: { type: String, default: '#6366f1' },
   brandingCompanyName: { type: String, default: '' },
+  resetToken: { type: String, default: undefined },
+  resetTokenExpiry: { type: Date, default: undefined },
 });
 
 UserSchema.pre('save', function (next) {

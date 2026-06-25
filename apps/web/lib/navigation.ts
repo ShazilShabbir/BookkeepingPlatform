@@ -21,6 +21,7 @@ export const tabLabels: Record<string, string> = {
   team: 'Team',
   support: 'Support',
   trash: 'Trash',
+  billing: 'Billing',
   settings: 'Settings',
 };
 

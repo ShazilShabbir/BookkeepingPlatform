@@ -5,6 +5,8 @@ import LandingFeatures from '@/components/LandingFeatures';
 import LandingHowItWorks from '@/components/LandingHowItWorks';
 import LandingPricing from '@/components/LandingPricing';
 import LandingTestimonials from '@/components/LandingTestimonials';
+import LandingSocialProof from '@/components/LandingSocialProof';
+import LandingComparison from '@/components/LandingComparison';
 import LandingFAQ from '@/components/LandingFAQ';
 import LandingCTA from '@/components/LandingCTA';
 import Footer from '@/components/Footer';
@@ -72,8 +74,10 @@ export default function Home() {
       <div className="min-h-screen">
         <LandingHero />
         <div id="features" className="scroll-mt-20"><LandingFeatures /></div>
+        <div className="scroll-mt-20"><LandingSocialProof /></div>
         <div className="scroll-mt-20"><LandingHowItWorks /></div>
         <div id="pricing" className="scroll-mt-20"><LandingPricing /></div>
+        <div className="scroll-mt-20"><LandingComparison /></div>
         <div className="scroll-mt-20"><LandingTestimonials /></div>
         <div id="faq" className="scroll-mt-20"><LandingFAQ /></div>
         <LandingCTA />
