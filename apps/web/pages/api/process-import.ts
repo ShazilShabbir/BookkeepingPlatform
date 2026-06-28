@@ -5,6 +5,7 @@ import ImportJob from '@/lib/models/ImportJob';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 import ClosedPeriod from '@/lib/models/ClosedPeriod';
 import CategoryMapping from '@/lib/models/CategoryMapping';
 import { KEYWORD_RULES, classifyRow, cleanDate } from '@/lib/classify';
@@ -97,6 +98,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const dedupEnabled = (job as any).dedupEnabled !== false;
     const aiMappings: Record<string, string> = (job as any).aiMappings || {};
     const jobCustomFieldMapping: Record<string, string> = (job as any).customFieldMapping || {};
+
+    // Load custom field definitions for required field validation
+    const userDoc = await User.findOne({ email: uid }).lean();
+    const customFieldDefs = (userDoc as any)?.customFields || (userDoc as any)?.csvProfiles?.[0]?.customFields || [];
+    const requiredFieldIds = customFieldDefs.filter((f: any) => f.required).map((f: any) => f.id);
 
     let accountsByCode = new Map<string, { code: string; name: string; type: string }>();
     const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
@@ -247,9 +253,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         const entryId = new (require('mongoose').Types.ObjectId)();
         const customFieldValues: Record<string, string> = {};
+        let missingRequired = false;
         for (const [fieldId, csvCol] of Object.entries(jobCustomFieldMapping)) {
           const val = row[csvCol]?.trim();
           if (val) customFieldValues[fieldId] = val;
+          else if (requiredFieldIds.includes(fieldId)) missingRequired = true;
+        }
+
+        // Skip rows with missing required custom fields
+        if (missingRequired && requiredFieldIds.length > 0) {
+          skippedRows++;
+          continue;
         }
         entriesToInsert.push({
           _id: entryId,

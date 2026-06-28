@@ -29,6 +29,7 @@ export default memo(function ProfitLoss() {
   const [endDate, setEndDate] = useState('');
   const [data, setData] = useState<ProfitLossData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -41,6 +42,7 @@ export default memo(function ProfitLoss() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load P&L');
       setData(json.data);
+      if (json.data?.baseCurrency) setBaseCurrency(json.data.baseCurrency);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to load P&L');
     } finally {
@@ -90,7 +92,7 @@ export default memo(function ProfitLoss() {
                 <div key={section.type}>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-base font-semibold text-surface-900">{section.title}</h3>
-                    <span className="text-lg font-bold text-surface-900">{formatCurrency(section.total)}</span>
+                    <span className="text-lg font-bold text-surface-900">{formatCurrency(section.total, baseCurrency)}</span>
                   </div>
                   <div className="overflow-x-auto border border-surface-200 rounded-lg">
                     <table className="w-full text-sm">
@@ -108,7 +110,7 @@ export default memo(function ProfitLoss() {
                               <span className="text-surface-900">{acc.accountName}</span>
                             </td>
                             <td className="py-2 px-4 text-right font-mono font-medium text-surface-900">
-                              {formatCurrency(acc.balance)}
+                              {formatCurrency(acc.balance, baseCurrency)}
                             </td>
                           </tr>
                         ))}
@@ -128,7 +130,7 @@ export default memo(function ProfitLoss() {
                   </div>
                   <div className="text-right">
                     <p className={`text-2xl font-bold ${data.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatCurrency(data.netIncome)}
+                      {formatCurrency(data.netIncome, baseCurrency)}
                     </p>
                     <p className="text-sm text-surface-500">
                       Margin: <span className="font-semibold">{data.netIncomeRatio}%</span>

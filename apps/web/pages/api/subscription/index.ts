@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await dbConnect();
 
   try {
-    const user = await User.findById(uid).select('subscriptionTier subscriptionStatus currentPeriodEnd stripeCustomerId createdAt').lean();
+    const user = await User.findById(uid).select('subscriptionTier subscriptionStatus currentPeriodEnd stripeCustomerId createdAt baseCurrency').lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const tier = ((user as any).subscriptionTier || 'free') as Tier;
@@ -49,6 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         limits: { entryLimit: limit === -1 ? 'Unlimited' : limit, maxUsers: config.maxUsers },
         usage: { entryCount: used },
         createdAt: (user as any).createdAt,
+        baseCurrency: (user as any).baseCurrency || 'USD',
         allTiers,
       },
     });

@@ -1,6 +1,5 @@
 import { memo, useEffect, useState } from 'react';
 import { Card, ChartSkeleton } from '@/components/ui';
-import { formatCurrency } from '@/lib/format';
 
 interface Insight {
   type: string;
@@ -46,7 +45,7 @@ export default memo(function InsightsPanel({ userId, startDate, endDate }: { use
         if (!res.ok) throw new Error('Failed to load');
         const json = await res.json();
         if (!json.success) throw new Error(json.error || 'Failed to load');
-        if (json.data.hasData) setInsights(json.data.insights);
+        if (json.data?.hasData) setInsights(json.data.insights);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Error');
       } finally { setLoading(false); }

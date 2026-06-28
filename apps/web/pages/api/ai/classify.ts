@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 import { classifyTransactions } from '@/lib/ai';
 import { classifyRow } from '@/lib/classify';
 import { checkFeatureAccess } from '@/lib/subscription';
@@ -34,6 +35,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const accountsByCode = buildAccountMap(accountDocs);
     const accounts = Array.from(accountsByCode.values());
 
+    const userDoc = await User.findOne({ id: uid }, { baseCurrency: 1 }).lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
     const aiInput = transactions.map((t: any) => ({
       date: t.date || '',
       description: t.description || '',
@@ -41,7 +45,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       isDebit: t.amount < 0,
     }));
 
-    const aiResults = await classifyTransactions(aiInput, accounts);
+    const aiResults = await classifyTransactions(aiInput, accounts, baseCurrency);
     const results = transactions.map((t: any, i: number) => {
       let accountCode: string;
       let accountName: string;

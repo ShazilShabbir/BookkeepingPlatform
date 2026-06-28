@@ -10,13 +10,13 @@ interface ChartData {
   previous: number;
 }
 
-const CustomTooltip = memo(({ active, payload, label }: TooltipProps<number, string>) => {
+const CustomTooltip = memo(({ active, payload, label, currency }: TooltipProps<number, string> & { currency?: string }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-surface-800 text-white px-4 py-3 rounded-lg shadow-elevated text-sm">
       <p className="text-surface-300 mb-1">{label}</p>
       {payload.map((p, i: number) => (
-        <p key={i} className="font-semibold" style={{ color: p.color }}>{p.name}: {formatCurrency(p.value ?? 0)}</p>
+        <p key={i} className="font-semibold" style={{ color: p.color }}>{p.name}: {formatCurrency(p.value ?? 0, currency)}</p>
       ))}
     </div>
   );
@@ -39,6 +39,8 @@ export default memo(function ComparisonChart({ userId, startDate, endDate, onMon
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [retryKey, setRetryKey] = useState(0);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,15 +54,16 @@ export default memo(function ComparisonChart({ userId, startDate, endDate, onMon
         if (!res.ok) throw new Error('Failed to load');
         const json = await res.json();
         if (!json.success) throw new Error(json.error || 'Failed to load');
+        if (json.baseCurrency) setBaseCurrency(json.baseCurrency);
         const all = json.data as { month: string; revenue: number; expenses: number }[];
 
         if (mode === 'yoy') {
           const half = Math.floor(all.length / 2);
-          // Ensure we have data to split
           if (half < 1) { setData([]); return; }
           const prevYear = all.slice(0, half);
           const currYear = all.slice(half);
-          setData(currYear.map((c, i) => ({
+          const len = Math.min(prevYear.length, currYear.length);
+          setData(currYear.slice(0, len).map((c, i) => ({
             month: c.month.slice(-2),
             current: Math.round((c.revenue - c.expenses) * 100) / 100,
             previous: Math.round(((prevYear[i]?.revenue || 0) - (prevYear[i]?.expenses || 0)) * 100) / 100,
@@ -80,7 +83,7 @@ export default memo(function ComparisonChart({ userId, startDate, endDate, onMon
       } finally { setLoading(false); }
     };
     fetchData();
-  }, [userId, mode, startDate, endDate]);
+  }, [userId, mode, startDate, endDate, retryKey]);
 
   if (loading) return <Card padding="md"><ChartSkeleton /></Card>;
 
@@ -88,7 +91,7 @@ export default memo(function ComparisonChart({ userId, startDate, endDate, onMon
     <Card padding="md">
       <div className="flex flex-col items-center justify-center py-8 text-surface-400">
         <p className="text-sm text-red-500 mb-2">{error}</p>
-        <Button size="sm" variant="secondary" onClick={() => window.location.reload()}>Retry</Button>
+        <Button size="sm" variant="secondary" onClick={() => setRetryKey(k => k + 1)}>Retry</Button>
       </div>
     </Card>
   );
@@ -117,8 +120,8 @@ export default memo(function ComparisonChart({ userId, startDate, endDate, onMon
             <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} />
-              <Tooltip content={<CustomTooltip />} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v, baseCurrency)} />
+              <Tooltip content={<CustomTooltip currency={baseCurrency} />} />
               <Legend iconType="rect" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="current" name={mode === 'yoy' ? 'This Year' : 'This Month'} fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={mode === 'mom' ? 60 : 24} onClick={(e: any) => { if (onMonthClick && e?.activeLabel) onMonthClick(e.activeLabel); }} style={{ cursor: onMonthClick ? 'pointer' : 'default' }} />
               <Bar dataKey="previous" name={mode === 'yoy' ? 'Last Year' : 'Last Month'} fill="#a5b4fc" radius={[4, 4, 0, 0]} maxBarSize={mode === 'mom' ? 60 : 24} onClick={(e: any) => { if (onMonthClick && e?.activeLabel) onMonthClick(e.activeLabel); }} style={{ cursor: onMonthClick ? 'pointer' : 'default' }} />

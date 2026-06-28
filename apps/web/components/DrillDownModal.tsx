@@ -66,6 +66,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [baseCurrency, setBaseCurrency] = useState('USD');
   const [breadcrumbs, setBreadcrumbs] = useState<DrillBreadcrumb[]>([{ label: LABELS[drill.type], state: drill }]);
   const currentDrill = breadcrumbs[breadcrumbs.length - 1].state;
 
@@ -75,12 +76,13 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
       const json = await fetchDrillData(userId, d.type, d.params);
       if (!json.success) throw new Error(json.error || 'Failed to load');
       setData(json.data);
+      if ((json.data as any)?.baseCurrency) setBaseCurrency((json.data as any).baseCurrency);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error loading data');
     } finally { setLoading(false); }
   }, [userId]);
 
-  useEffect(() => { if (open) load(drill); }, [open, drill, load]);
+  useEffect(() => { if (open) { setBreadcrumbs([{ label: LABELS[drill.type], state: drill }]); load(drill); } }, [open, drill, load]);
 
   const drillTo = (type: DrillType, params: DrillParams, label: string) => {
     const newState = { type, params };
@@ -150,7 +152,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
         const bd = d.breakdown || [];
         return (
           <div>
-            <p className="text-sm text-surface-500 mb-3">Total: {formatCurrencyCompact(Number(d.total) || 0)}</p>
+            <p className="text-sm text-surface-500 mb-3">Total: {formatCurrencyCompact(Number(d.total) || 0, baseCurrency)}</p>
             {bd.length === 0 ? <p className="text-center py-8 text-surface-400 text-sm">No data</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -158,7 +160,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
                   <tbody>{bd.map((r: any) => (
                     <tr key={r.category} className="border-b border-surface-100 cursor-pointer hover:bg-surface-50" onClick={() => drillTo('category-detail', { category: r.category, startDate: currentDrill.params.startDate, endDate: currentDrill.params.endDate }, r.category)}>
                       <td className="py-2 text-surface-900">{r.category}</td>
-                      <td className={`py-2 text-right ${isRev ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(r.amount)}</td>
+                      <td className={`py-2 text-right ${isRev ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(r.amount, baseCurrency)}</td>
                       <td className="py-2 text-right text-surface-600">{r.percentage}%</td>
                       <td className="py-2 text-right text-surface-600">{r.count}</td>
                     </tr>
@@ -181,7 +183,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
             ].map((r) => (
               <div key={r.label} className="flex items-center justify-between py-2 border-b border-surface-100">
                 <span className="text-sm text-surface-600">{r.label}</span>
-                <span className={`text-sm font-semibold ${r.color}`}>{typeof r.value === 'number' ? formatCurrencyCompact(r.value) : r.value}</span>
+                <span className={`text-sm font-semibold ${r.color}`}>{typeof r.value === 'number' ? formatCurrencyCompact(r.value, baseCurrency) : r.value}</span>
               </div>
             ))}
           </div>
@@ -210,7 +212,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
         const accounts = d.accounts || [];
         return (
           <div>
-            <p className="text-sm text-surface-500 mb-3">Total: {formatCurrencyCompact(Number(d.total) || 0)}</p>
+            <p className="text-sm text-surface-500 mb-3">Total: {formatCurrencyCompact(Number(d.total) || 0, baseCurrency)}</p>
             {accounts.length === 0 ? <p className="text-center py-8 text-surface-400 text-sm">No cash accounts</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -218,7 +220,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
                   <tbody>{accounts.map((r: any) => (
                     <tr key={r.accountCode} className="border-b border-surface-100 cursor-pointer hover:bg-surface-50" onClick={() => drillTo('account-journal', { accountCode: r.accountCode }, r.accountName)}>
                       <td className="py-2 text-surface-900">{r.accountName} <span className="text-surface-400 text-xs ml-1">{r.accountCode}</span></td>
-                      <td className="py-2 text-right font-medium text-surface-900">{formatCurrencyCompact(r.balance)}</td>
+                      <td className="py-2 text-right font-medium text-surface-900">{formatCurrencyCompact(r.balance, baseCurrency)}</td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -246,7 +248,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
                     <tr key={r._id} className="border-b border-surface-100 cursor-pointer hover:bg-surface-50" onClick={() => drillTo('entry-detail', { entryId: r._id }, 'Entry')}>
                       <td className="py-2 text-surface-600 text-xs">{r.date?.slice(0, 10)}</td>
                       <td className="py-2 text-surface-900 max-w-[200px] truncate">{r.description || '—'}</td>
-                      <td className="py-2 text-right font-medium text-surface-900">{formatCurrencyCompact(r.amount)}</td>
+                      <td className="py-2 text-right font-medium text-surface-900">{formatCurrencyCompact(r.amount, baseCurrency)}</td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -267,7 +269,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
         const isEmpty = accounts.length === 0;
         return (
           <div>
-            <p className="text-sm text-surface-500 mb-3">Total: {formatCurrencyCompact(Number(d.total) || 0)}</p>
+            <p className="text-sm text-surface-500 mb-3">Total: {formatCurrencyCompact(Number(d.total) || 0, baseCurrency)}</p>
             {isEmpty ? <p className="text-center py-8 text-surface-400 text-sm">No data</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -275,7 +277,7 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
                   <tbody>{accounts.map((r: any) => (
                     <tr key={r.accountCode} className="border-b border-surface-100 cursor-pointer hover:bg-surface-50" onClick={() => drillTo('account-journal', { accountCode: r.accountCode }, r.accountName)}>
                       <td className="py-2 text-surface-900">{r.accountName} <span className="text-surface-400 text-xs ml-1">{r.accountCode}</span></td>
-                      <td className={`py-2 text-right font-medium ${r.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(r.amount)}</td>
+                      <td className={`py-2 text-right font-medium ${r.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(r.amount, baseCurrency)}</td>
                       <td className="py-2 text-right text-surface-600">{r.percentage}%</td>
                     </tr>
                   ))}</tbody>
@@ -309,15 +311,15 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
                   <tbody>{lines.map((l: any, i: number) => (
                     <tr key={i} className="border-b border-surface-100">
                       <td className="py-2 text-surface-900">{l.accountName} <span className="text-surface-400 text-xs ml-1">{l.accountCode}</span></td>
-                      <td className="py-2 text-right text-surface-900">{l.debit > 0 ? formatCurrency(l.debit) : '—'}</td>
-                      <td className="py-2 text-right text-surface-900">{l.credit > 0 ? formatCurrency(l.credit) : '—'}</td>
+                      <td className="py-2 text-right text-surface-900">{l.debit > 0 ? formatCurrency(l.debit, baseCurrency) : '—'}</td>
+                      <td className="py-2 text-right text-surface-900">{l.credit > 0 ? formatCurrency(l.credit, baseCurrency) : '—'}</td>
                     </tr>
                   ))}</tbody>
                   <tfoot>
                     <tr className="border-t-2 border-surface-300 font-semibold">
                       <td className="py-2 text-surface-700">Total</td>
-                      <td className="py-2 text-right">{formatCurrency(totalDebit)}</td>
-                      <td className="py-2 text-right">{formatCurrency(totalCredit)}</td>
+                      <td className="py-2 text-right">{formatCurrency(totalDebit, baseCurrency)}</td>
+                      <td className="py-2 text-right">{formatCurrency(totalCredit, baseCurrency)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -352,8 +354,8 @@ export default function DrillDownModal({ open, onClose, drill, onDrill, userId }
                     <tr key={i} className="border-b border-surface-100">
                       <td className="py-2 text-surface-600 text-xs">{l.date?.slice(0, 10)}</td>
                       <td className="py-2 text-surface-900 max-w-[200px] truncate">{l.description || '—'}</td>
-                      <td className="py-2 text-right text-surface-900">{l.debit > 0 ? formatCurrency(l.debit) : '—'}</td>
-                      <td className="py-2 text-right text-surface-900">{l.credit > 0 ? formatCurrency(l.credit) : '—'}</td>
+                      <td className="py-2 text-right text-surface-900">{l.debit > 0 ? formatCurrency(l.debit, baseCurrency) : '—'}</td>
+                      <td className="py-2 text-right text-surface-900">{l.credit > 0 ? formatCurrency(l.credit, baseCurrency) : '—'}</td>
                     </tr>
                   ))}</tbody>
                 </table>

@@ -9,6 +9,7 @@ const profileSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   email: z.string().email().max(255).optional(),
   companyName: z.string().max(200).optional(),
+  baseCurrency: z.string().min(3).max(3).optional(),
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -30,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (parsed.data.name) updates.name = parsed.data.name;
     if (parsed.data.email) updates.email = parsed.data.email.toLowerCase();
     if (parsed.data.companyName !== undefined) updates.companyName = parsed.data.companyName;
+    if (parsed.data.baseCurrency) updates.baseCurrency = parsed.data.baseCurrency.toUpperCase();
 
     if (updates.email) {
       const existing = await User.findOne({ email: updates.email, _id: { $ne: session.user.id } });
@@ -46,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         name: user.name,
         email: user.email,
         companyName: user.companyName,
+        baseCurrency: (user as any).baseCurrency || 'USD',
       },
     });
   } catch (e: any) {

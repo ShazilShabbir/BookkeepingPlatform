@@ -3,6 +3,7 @@ import { Button, Badge } from '@/components/ui';
 import InvoiceForm from '@/components/InvoiceForm';
 import toast from 'react-hot-toast';
 import type { InvoiceData, InvoiceStatus } from '@/types/invoice';
+import { getCurrencySymbol } from '@/lib/format';
 
 const STATUS_BADGE: Record<InvoiceStatus, { variant: 'success' | 'warning' | 'danger' | 'info' | 'default'; label: string }> = {
   draft: { variant: 'default', label: 'Draft' },
@@ -25,12 +26,12 @@ export default function InvoiceDetail({ invoice, onClose, onUpdate }: Props) {
   const doAction = async (action: string, url: string, method = 'POST') => {
     setActionLoading(action);
     try {
-      const res = await fetch(url, { method });
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'POST' ? JSON.stringify({ action }) : undefined });
       const json = await res.json();
       if (json.success) {
         toast.success(`${action.charAt(0).toUpperCase() + action.slice(1)} successful`);
         onUpdate();
-        if (action !== 'delete') onClose();
+        onClose();
       } else toast.error(json.error || `Failed to ${action}`);
     } catch { toast.error(`Failed to ${action}`); }
     setActionLoading(null);
@@ -114,8 +115,8 @@ export default function InvoiceDetail({ invoice, onClose, onUpdate }: Props) {
                   <tr key={i} className="border-b border-surface-100">
                     <td className="py-2 px-2 text-surface-700">{li.description}</td>
                     <td className="py-2 px-2 text-right text-surface-700">{li.quantity}</td>
-                    <td className="py-2 px-2 text-right text-surface-700 font-mono">${li.unitPrice.toFixed(2)}</td>
-                    <td className="py-2 px-2 text-right text-surface-900 font-mono font-medium">${li.amount.toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right text-surface-700 font-mono">{getCurrencySymbol(invoice.currency)}{li.unitPrice.toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right text-surface-900 font-mono font-medium">{getCurrencySymbol(invoice.currency)}{li.amount.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -123,10 +124,10 @@ export default function InvoiceDetail({ invoice, onClose, onUpdate }: Props) {
           </div>
 
           <div className="text-right space-y-1 border-t border-surface-200 pt-4">
-            <p className="text-sm text-surface-500">Subtotal: <span className="font-mono">${invoice.subtotal.toFixed(2)}</span></p>
-            {invoice.taxRate > 0 && <p className="text-sm text-surface-500">Tax ({invoice.taxRate}%): <span className="font-mono">${invoice.taxAmount.toFixed(2)}</span></p>}
-            <p className="text-xl font-bold text-surface-900">Total: <span className="font-mono">${invoice.total.toFixed(2)}</span></p>
-            {invoice.amountPaid > 0 && <p className="text-sm text-emerald-600">Paid: <span className="font-mono">${invoice.amountPaid.toFixed(2)}</span></p>}
+            <p className="text-sm text-surface-500">Subtotal: <span className="font-mono">{getCurrencySymbol(invoice.currency)}{invoice.subtotal.toFixed(2)}</span></p>
+            {invoice.taxRate > 0 && <p className="text-sm text-surface-500">Tax ({invoice.taxRate}%): <span className="font-mono">{getCurrencySymbol(invoice.currency)}{invoice.taxAmount.toFixed(2)}</span></p>}
+            <p className="text-xl font-bold text-surface-900">Total: <span className="font-mono">{getCurrencySymbol(invoice.currency)}{invoice.total.toFixed(2)}</span></p>
+            {invoice.amountPaid > 0 && <p className="text-sm text-emerald-600">Paid: <span className="font-mono">{getCurrencySymbol(invoice.currency)}{invoice.amountPaid.toFixed(2)}</span></p>}
           </div>
 
           {invoice.notes && (
@@ -158,8 +159,11 @@ export default function InvoiceDetail({ invoice, onClose, onUpdate }: Props) {
                 <Button size="sm" loading={actionLoading === 'send'} onClick={() => doAction('send', `/api/invoices/${invoice._id}/send`)}>Send</Button>
               </>
             )}
-            {invoice.status === 'sent' && (
-              <Button size="sm" loading={actionLoading === 'pay'} onClick={handlePay} disabled={!invoice.total}>Send Payment Link</Button>
+            {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+              <>
+                <Button size="sm" variant="ghost" loading={actionLoading === 'pay'} onClick={handlePay} disabled={!invoice.total}>Send Payment Link</Button>
+                <Button size="sm" loading={actionLoading === 'mark-paid'} onClick={() => doAction('mark-paid', `/api/invoices/${invoice._id}`)} className="bg-emerald-600 hover:bg-emerald-700 text-white">Mark as Paid</Button>
+              </>
             )}
             {invoice.status === 'draft' && (
               <Button size="sm" variant="ghost" loading={actionLoading === 'delete'} onClick={() => doAction('delete', `/api/invoices/${invoice._id}`, 'DELETE')} className="text-red-600 hover:text-red-700">Delete</Button>

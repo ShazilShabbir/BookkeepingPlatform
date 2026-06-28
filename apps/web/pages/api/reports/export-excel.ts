@@ -27,9 +27,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { startDate, endDate } = req.body;
     await dbConnect();
-    const user = await User.findById(uid).select('brandingPrimaryColor brandingCompanyName').lean();
+    const user = await User.findById(uid).select('brandingPrimaryColor brandingCompanyName baseCurrency').lean();
     const branding = user ? { primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName } : undefined;
-    const workbook = await generateWorkbook(uid, startDate, endDate, branding);
+    const baseCurrency = (user as any)?.baseCurrency || 'USD';
+    const workbook = await generateWorkbook(uid, startDate, endDate, branding, baseCurrency);
     const buffer = await workbook.xlsx.writeBuffer();
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

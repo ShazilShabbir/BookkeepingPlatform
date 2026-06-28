@@ -193,10 +193,10 @@ export default function ClientManager({ userId }: { userId: string }) {
                 {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
               </span>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="secondary" onClick={() => { setPage(p => p - 1); loadClients(page - 1); }} disabled={page <= 1}>
+                <Button size="sm" variant="secondary" onClick={() => { const pg = page - 1; setPage(pg); loadClients(pg); }} disabled={page <= 1}>
                   Previous
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => { setPage(p => p + 1); loadClients(page + 1); }} disabled={page >= totalPages}>
+                <Button size="sm" variant="secondary" onClick={() => { const pg = page + 1; setPage(pg); loadClients(pg); }} disabled={page >= totalPages}>
                   Next
                 </Button>
               </div>

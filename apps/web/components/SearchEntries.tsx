@@ -66,10 +66,12 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ date: '', description: '' });
+  const [editForm, setEditForm] = useState({ date: '', description: '', customFieldValues: {} as Record<string, any> });
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
   const [saving, setSaving] = useState(false);
   const [customFieldDefs, setCustomFieldDefs] = useState<CustomFieldDef[]>([]);
+  const [customFieldFilters, setCustomFieldFilters] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
 
@@ -90,6 +92,11 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
         const res = await fetch('/api/accounts?userId=' + encodeURIComponent(userId));
         const json = await res.json();
         if (json.success) setAccounts(json.data || []);
+      } catch {}
+      try {
+        const res = await fetch('/api/subscription?userId=' + encodeURIComponent(userId));
+        const json = await res.json();
+        if (json.success && json.data?.baseCurrency) setBaseCurrency(json.data.baseCurrency);
       } catch {}
     };
     loadAccounts();
@@ -148,8 +155,14 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
       if (userId) params.set('userId', userId);
-      params.set('page', String(page));
+      params.set('page', String(currentPage));
       params.set('pageSize', '50');
+
+      // Add custom field filters
+      const activeFilters = Object.entries(customFieldFilters).filter(([, v]) => v.trim());
+      if (activeFilters.length > 0) {
+        params.set('customFieldFilters', JSON.stringify(Object.fromEntries(activeFilters)));
+      }
 
       const res = await fetch(`/api/entries/search?${params.toString()}`, { signal: controller.signal });
       const json: SearchResponse = await res.json();
@@ -168,7 +181,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
     } finally {
       if (searchAbortRef.current === controller) setLoading(false);
     }
-  }, [query, typeFilter, startDate, endDate, page, accounts]);
+  }, [query, typeFilter, startDate, endDate, customFieldFilters, page, accounts]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,6 +199,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
     setTypeFilter('');
     setStartDate('');
     setEndDate('');
+    setCustomFieldFilters({});
     setEntries([]);
     setPage(1);
     setHasMore(false);
@@ -193,26 +207,33 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
     setSearched(false);
     setExpandedRow(null);
     setEditingId(null);
-    setEditForm({ date: '', description: '' });
+    setEditForm({ date: '', description: '', customFieldValues: {} });
     if (inputRef.current) inputRef.current.focus();
   };
 
   const startEdit = (entry: DisplayEntry) => {
     setEditingId(entry.id);
-    setEditForm({ date: entry.date, description: entry.description });
+    setEditForm({
+      date: entry.date,
+      description: entry.description,
+      customFieldValues: entry.customFieldValues ? { ...entry.customFieldValues } : {},
+    });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ date: '', description: '' });
+    setEditForm({ date: '', description: '', customFieldValues: {} });
   };
 
   const saveEdit = async (entryId: string) => {
     setSaving(true);
     try {
-      const body: Record<string, string> = {};
+      const body: Record<string, any> = {};
       if (editForm.date) body.date = editForm.date;
       if (editForm.description) body.description = editForm.description;
+      if (Object.keys(editForm.customFieldValues).length > 0) {
+        body.customFieldValues = editForm.customFieldValues;
+      }
       const res = await fetch(`/api/entries/${entryId}?userId=${encodeURIComponent(userId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -223,7 +244,12 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
       toast.success('Entry updated');
       setEntries(prev => prev.map(e => {
         if (e.id !== entryId) return e;
-        return { ...e, date: editForm.date || e.date, description: editForm.description || e.description };
+        return {
+          ...e,
+          date: editForm.date || e.date,
+          description: editForm.description || e.description,
+          customFieldValues: Object.keys(editForm.customFieldValues).length > 0 ? editForm.customFieldValues : e.customFieldValues,
+        };
       }));
       cancelEdit();
     } catch (err: unknown) {
@@ -294,6 +320,18 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
                 className="flex-1 sm:flex-none text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700" />
             </div>
+            {customFieldDefs.length > 0 && customFieldDefs.map(field => (
+              <div key={field.id} className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="text-xs text-surface-500 shrink-0">{field.label}</label>
+                <input
+                  type="text"
+                  value={customFieldFilters[field.id] || ''}
+                  onChange={e => setCustomFieldFilters(prev => ({ ...prev, [field.id]: e.target.value }))}
+                  placeholder={`Filter by ${field.label}...`}
+                  className="flex-1 sm:flex-none text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white text-surface-700"
+                />
+              </div>
+            ))}
             {searched && (
               <button type="button" onClick={clearFilters} className="text-xs text-primary-600 hover:underline self-center ml-auto">
                 Clear filters
@@ -340,7 +378,7 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
                   </div>
                   <div className="text-right shrink-0">
                     <div className={`text-sm font-semibold ${entry.type === 'expense' ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {formatAmount(entry.amount)}
+                      {formatAmount(entry.amount, baseCurrency)}
                     </div>
                     <Badge variant={entry.type === 'income' ? 'success' : 'danger'} size="sm">{entry.type}</Badge>
                   </div>
@@ -364,6 +402,40 @@ export default function SearchEntries({ userId, customerUid }: { userId: string;
                               className="w-full text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white" />
                           </div>
                         </div>
+                        {customFieldDefs.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {customFieldDefs.map(field => (
+                              <div key={field.id}>
+                                <label className="text-xs text-surface-500 block mb-1">{field.label}</label>
+                                {field.type === 'boolean' ? (
+                                  <select
+                                    value={editForm.customFieldValues[field.id] || ''}
+                                    onChange={e => setEditForm(f => ({
+                                      ...f,
+                                      customFieldValues: { ...f.customFieldValues, [field.id]: e.target.value },
+                                    }))}
+                                    className="w-full text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white"
+                                  >
+                                    <option value="">Not set</option>
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                  </select>
+                                ) : (
+                                  <input
+                                    type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+                                    value={editForm.customFieldValues[field.id] || ''}
+                                    onChange={e => setEditForm(f => ({
+                                      ...f,
+                                      customFieldValues: { ...f.customFieldValues, [field.id]: e.target.value },
+                                    }))}
+                                    placeholder={field.label}
+                                    className="w-full text-sm border border-surface-200 rounded-lg px-3 py-2 bg-white"
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" onClick={() => saveEdit(entry.id)} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
                           <Button size="sm" variant="secondary" onClick={cancelEdit}>Cancel</Button>

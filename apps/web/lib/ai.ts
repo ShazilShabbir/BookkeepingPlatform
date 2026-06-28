@@ -135,13 +135,14 @@ Guidelines:
 export async function classifyTransactions(
   transactions: ClassifyInput[],
   accounts: AccountInfo[],
+  baseCurrency: string = 'USD',
 ): Promise<TransactionClassification[] | null> {
   if (transactions.length === 0) return [];
 
   const accountList = accounts.map(a => `${a.code} ${a.name} (${a.type})`).join('\n');
 
   const txnText = transactions.map((t, i) =>
-    `${i}. "${t.description}" | ${t.isDebit ? '-' : '+'}$${Math.abs(t.amount).toFixed(2)} (${t.isDebit ? 'debit/withdrawal' : 'credit/deposit'})`
+    `${i}. "${t.description}" | ${t.isDebit ? '-' : '+'}${Math.abs(t.amount).toFixed(2)} ${baseCurrency} (${t.isDebit ? 'debit/withdrawal' : 'credit/deposit'})`
   ).join('\n');
 
   const keywordHints = KEYWORD_RULES.map(r =>

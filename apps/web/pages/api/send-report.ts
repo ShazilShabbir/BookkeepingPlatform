@@ -30,9 +30,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const client = await Client.findOne({ _id: clientId, userId: uid }).lean();
     const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
 
-    const statements = await getFinancialStatements(uid, startDate, endDate);
+    const statements = await getFinancialStatements(uid, startDate, endDate, (user as any)?.baseCurrency || 'USD');
     const html = generateReportHTML(statements, ownerName, shareLink, branding);
-    const workbook = await generateWorkbook(uid, startDate, endDate, branding);
+    const workbook = await generateWorkbook(uid, startDate, endDate, branding, (user as any)?.baseCurrency || 'USD');
     const buffer = await workbook.xlsx.writeBuffer();
 
     const { Resend } = await import('resend');

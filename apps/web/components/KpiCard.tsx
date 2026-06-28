@@ -13,11 +13,12 @@ interface KpiCardProps {
   trend?: number;
   trendData?: number[];
   isCurrency?: boolean;
+  currency?: string;
   onClick?: () => void;
   index?: number;
 }
 
-export default memo(function KpiCard({ label, value = 0, prefix = '', suffix = '', color, accent, icon, trend, trendData, isCurrency = false, onClick, index = 0 }: KpiCardProps) {
+export default memo(function KpiCard({ label, value = 0, prefix = '', suffix = '', color, accent, icon, trend, trendData, isCurrency = false, currency = 'USD', onClick, index = 0 }: KpiCardProps) {
   const [displayValue, setDisplayValue] = useState(0);
   const animated = useRef(false);
 
@@ -67,7 +68,7 @@ export default memo(function KpiCard({ label, value = 0, prefix = '', suffix = '
       </div>
       <p className="text-xs text-surface-500 mb-0.5 font-medium uppercase tracking-wider">{label}</p>
       <p className="text-xl sm:text-2xl font-bold text-surface-900 truncate">
-        {isCurrency ? formatCurrency(displayValue) : `${prefix}${(value % 1 === 0 ? value : displayValue.toFixed(2)).toLocaleString()}${suffix}`}
+        {isCurrency ? formatCurrency(displayValue, currency) : `${prefix}${displayValue.toLocaleString(undefined, { minimumFractionDigits: displayValue % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 })}${suffix}`}
       </p>
       {trendData && trendData.length > 1 && (
         <div className="mt-2 opacity-50">

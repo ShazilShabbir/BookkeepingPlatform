@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import ExchangeRate from '@/lib/models/ExchangeRate';
+import User from '@/lib/models/User';
 import { checkFeatureAccess } from '@/lib/subscription';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -15,8 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await dbConnect();
 
+    const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
     if (req.method === 'GET') {
-      const rates = await ExchangeRate.find({ userId: uid }).sort({ targetCurrency: 1, date: -1 }).lean();
+      const rates = await ExchangeRate.find({ userId: uid, baseCurrency }).sort({ targetCurrency: 1, date: -1 }).lean();
       const grouped: Record<string, { rate: number; date: string; source: string }> = {};
       for (const r of rates) {
         const key = (r as any).targetCurrency;
@@ -24,14 +28,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           grouped[key] = { rate: (r as any).rate, date: (r as any).date?.toISOString?.() || (r as any).date, source: (r as any).source };
         }
       }
-      return res.status(200).json({ success: true, data: grouped });
+      return res.status(200).json({ success: true, data: grouped, baseCurrency });
     }
 
     if (req.method === 'PUT') {
       const { targetCurrency, rate, date } = req.body;
       if (!targetCurrency || rate == null) return res.status(400).json({ error: 'targetCurrency and rate are required' });
 
-      const existing = await ExchangeRate.findOne({ userId: uid, targetCurrency, baseCurrency: 'USD' });
+      const existing = await ExchangeRate.findOne({ userId: uid, targetCurrency, baseCurrency });
       if (existing) {
         existing.rate = rate;
         existing.date = date ? new Date(date) : new Date();
@@ -40,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         await ExchangeRate.create({
           userId: uid,
-          baseCurrency: 'USD',
+          baseCurrency,
           targetCurrency: targetCurrency.toUpperCase(),
           rate,
           date: date ? new Date(date) : new Date(),
@@ -54,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'DELETE') {
       const { targetCurrency } = req.body;
       if (!targetCurrency) return res.status(400).json({ error: 'targetCurrency is required' });
-      await ExchangeRate.deleteMany({ userId: uid, targetCurrency });
+      await ExchangeRate.deleteMany({ userId: uid, targetCurrency, baseCurrency });
       return res.status(200).json({ success: true });
     }
 

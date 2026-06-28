@@ -3,6 +3,7 @@ import dbConnect from '@/lib/mongoose';
 import Invoice from '@/lib/models/Invoice';
 import { requireAuth } from '@/lib/auth';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { getCurrencySymbol } from '@/lib/format';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await requireAuth(req, res);
@@ -12,13 +13,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { id } = req.query;
   if (!id || Array.isArray(id)) return res.status(400).json({ error: 'id is required' });
 
-  await dbConnect();
-  const invoice = await Invoice.findOne({ _id: id, userId: uid }).lean();
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  try {
+    await dbConnect();
+    const invoice = await Invoice.findOne({ _id: id, userId: uid }).lean();
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
-  const pdfmake = await import('pdfmake/build/pdfmake');
-  const vfsFonts = await import('pdfmake/build/vfs_fonts');
-  (pdfmake as any).vfs = (vfsFonts as any).default.vfs;
+    const sym = getCurrencySymbol((invoice as any).currency || 'USD');
+
+    const pdfmake = await import('pdfmake/build/pdfmake');
+    const vfsFonts = await import('pdfmake/build/vfs_fonts');
+    (pdfmake as any).vfs = (vfsFonts as any).default.vfs;
 
   const dueDate = new Date((invoice as any).dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const issueDate = new Date((invoice as any).issueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -62,8 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...(invoice as any).lineItems.map((li: any) => [
               { text: li.description, style: 'tableCell' },
               { text: String(li.quantity), style: 'tableCell', alignment: 'right' },
-              { text: `$${li.unitPrice.toFixed(2)}`, style: 'tableCell', alignment: 'right' },
-              { text: `$${li.amount.toFixed(2)}`, style: 'tableCell', alignment: 'right' },
+              { text: `${sym}${li.unitPrice.toFixed(2)}`, style: 'tableCell', alignment: 'right' },
+              { text: `${sym}${li.amount.toFixed(2)}`, style: 'tableCell', alignment: 'right' },
             ]),
           ],
         },
@@ -80,10 +84,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           width: 'auto',
           stack: [
             ...((invoice as any).taxRate > 0 ? [
-              { text: `Subtotal: $${(invoice as any).subtotal.toFixed(2)}`, style: 'smallText', alignment: 'right', margin: [0, 0, 0, 4] },
-              { text: `Tax (${(invoice as any).taxRate}%): $${(invoice as any).taxAmount.toFixed(2)}`, style: 'smallText', alignment: 'right', margin: [0, 0, 0, 4] },
+              { text: `Subtotal: ${sym}${(invoice as any).subtotal.toFixed(2)}`, style: 'smallText', alignment: 'right', margin: [0, 0, 0, 4] },
+              { text: `Tax (${(invoice as any).taxRate}%): ${sym}${(invoice as any).taxAmount.toFixed(2)}`, style: 'smallText', alignment: 'right', margin: [0, 0, 0, 4] },
             ] : []),
-            { text: `Total: $${(invoice as any).total.toFixed(2)}`, style: 'totalText', alignment: 'right' },
+            { text: `Total: ${sym}${(invoice as any).total.toFixed(2)}`, style: 'totalText', alignment: 'right' },
           ],
         },
       ]},
@@ -105,7 +109,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     },
   };
 
-  try {
     const pdfDoc = (pdfmake as any).createPdf(docDefinition);
     const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
       pdfDoc.getBuffer((buf: Buffer) => resolve(buf));
@@ -114,7 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Content-Disposition', `inline; filename="${(invoice as any).invoiceNumber}.pdf"`);
     return res.status(200).send(pdfBuffer);
   } catch (e: any) {
-    console.error('PDF generation error:', e?.message || e);
-    return res.status(500).json({ error: 'Failed to generate PDF' });
+    console.error('[invoices/pdf] error:', e?.message);
+    return res.status(500).json({ error: e?.message || 'Internal server error' });
   }
 }

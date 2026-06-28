@@ -4,6 +4,8 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
+import ExchangeRate from '@/lib/models/ExchangeRate';
 import { checkFeatureAccess } from '@/lib/subscription';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
 
@@ -38,8 +40,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
     const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
-    const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
-    for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
+    const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+    const accountMap = new Map<string, { name: string; type: string; normalBalance: string; currency: string }>();
+    for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit', currency: (a as any).currency || 'USD' });
+
+    const exchangeRateDocs = await ExchangeRate.find({ userId: uid }).sort({ date: -1 }).lean();
+    const rateMap = new Map<string, number>();
+    for (const r of exchangeRateDocs) {
+      const key = `${(r as any).baseCurrency}:${(r as any).targetCurrency}`;
+      if (!rateMap.has(key)) rateMap.set(key, (r as any).rate);
+    }
+
+    const convertToBase = (amount: number, fromCurrency: string): number => {
+      if (fromCurrency === baseCurrency || !fromCurrency) return amount;
+      const key = `${fromCurrency}:${baseCurrency}`;
+      const rate = rateMap.get(key);
+      if (rate) return Math.round(amount * rate * 100) / 100;
+      const inverseKey = `${baseCurrency}:${fromCurrency}`;
+      const inverseRate = rateMap.get(inverseKey);
+      if (inverseRate && inverseRate > 0) return Math.round(amount / inverseRate * 100) / 100;
+      return amount;
+    };
 
     const cashAccountDocs = accountDocs.filter(a => a.type === 'asset' && (a.normalBalance || 'debit') === 'debit').sort((a, b) => a.code.localeCompare(b.code));
     const cashAccountCode = cashAccountDocs.length > 0 ? cashAccountDocs[0].code : '1000';
@@ -53,9 +75,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     for (const line of lines) {
       const code = line.accountCode;
       if (!code) continue;
+      const info = accountMap.get(code);
+      const lineCurrency = info?.currency || 'USD';
+      const convertedDebit = convertToBase(line.debit || 0, lineCurrency);
+      const convertedCredit = convertToBase(line.credit || 0, lineCurrency);
       const totals = accountTotals.get(code) || { debits: 0, credits: 0 };
-      totals.debits += line.debit || 0;
-      totals.credits += line.credit || 0;
+      totals.debits += convertedDebit;
+      totals.credits += convertedCredit;
       accountTotals.set(code, totals);
       const existing = linesByEntry.get(line.journalEntryId) || [];
       existing.push(line);
@@ -67,21 +93,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!monthlyAccountTotals.has(month)) monthlyAccountTotals.set(month, new Map());
         const mMap = monthlyAccountTotals.get(month)!;
         const mTotals = mMap.get(code) || { debits: 0, credits: 0 };
-        mTotals.debits += line.debit || 0;
-        mTotals.credits += line.credit || 0;
+        mTotals.debits += convertedDebit;
+        mTotals.credits += convertedCredit;
         mMap.set(code, mTotals);
 
         const day = entryDate.slice(0, 10);
         if (!dailyAccountTotals.has(day)) dailyAccountTotals.set(day, new Map());
         const dMap = dailyAccountTotals.get(day)!;
         const dTotals = dMap.get(code) || { debits: 0, credits: 0 };
-        dTotals.debits += line.debit || 0;
-        dTotals.credits += line.credit || 0;
+        dTotals.debits += convertedDebit;
+        dTotals.credits += convertedCredit;
         dMap.set(code, dTotals);
 
         const info = accountMap.get(code);
         if (info) {
-          const balance = info.normalBalance === 'credit' ? (line.credit || 0) - (line.debit || 0) : (line.debit || 0) - (line.credit || 0);
+          const balance = info.normalBalance === 'credit' ? convertedCredit - convertedDebit : convertedDebit - convertedCredit;
           if (Math.abs(balance) >= 0.01) {
             if (info.type === 'revenue') {
               const c = revenueByCategory.get(info.name) || { amount: 0, count: 0 };
@@ -203,7 +229,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const info = accountMap.get(line.accountCode);
         if (!info) continue;
         const side = cashLine.debit > 0 ? 'debit' : 'credit';
-        const amount = Math.round((side === 'debit' ? (line.credit || 0) : -(line.debit || 0)) * 100) / 100;
+        const lineCurrency = accountMap.get(line.accountCode)?.currency || 'USD';
+        const rawAmount = side === 'debit' ? (line.credit || 0) : -(line.debit || 0);
+        const amount = Math.round(convertToBase(rawAmount, lineCurrency) * 100) / 100;
         if (Math.abs(amount) < 0.01) continue;
         const item = { accountCode: line.accountCode, accountName: info.name, amount };
         const code = parseInt(line.accountCode);
@@ -249,6 +277,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cashFlow,
         trialBalance,
         dateRange: { startDate: startDate || null, endDate: endDate || null },
+        baseCurrency,
       },
     });
   } catch (e: any) {

@@ -336,7 +336,7 @@ export default function ImportCSV({ userId, customerUid }: ImportCSVProps) {
 
         const parseRes = await fetch(uploadPath, {
           method: 'POST',
-          body: f,
+          body: formData,
         });
         const parseJson = await parseRes.json();
 

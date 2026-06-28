@@ -12,11 +12,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = await resolveUserIdFromQuery(token, req);
 
-  await dbConnect();
-
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  try {
+    await dbConnect();
 
   const params = req.method === 'POST' ? req.body : req.query;
 
@@ -25,6 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const pageSize = Math.min(parseInt((params.pageSize as string) || '50'), 100);
   const startDate = params.startDate as string | undefined;
   const endDate = params.endDate as string | undefined;
+  const customFieldFilters = params.customFieldFilters as Record<string, string> | undefined;
 
   const match: Record<string, any> = { userId: uid };
 
@@ -32,6 +34,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     match.date = {};
     if (startDate) match.date.$gte = startDate;
     if (endDate) match.date.$lte = endDate;
+  }
+
+  // Apply custom field filters
+  if (customFieldFilters && typeof customFieldFilters === 'object') {
+    for (const [fieldId, value] of Object.entries(customFieldFilters)) {
+      if (value && value.trim()) {
+        match[`customFieldValues.${fieldId}`] = { $regex: value, $options: 'i' };
+      }
+    }
   }
 
   if (!q.trim()) {
@@ -87,6 +98,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (endDate) entryMatch.date.$lte = endDate;
   }
 
+  // Apply custom field filters to search results
+  if (customFieldFilters && typeof customFieldFilters === 'object') {
+    for (const [fieldId, value] of Object.entries(customFieldFilters)) {
+      if (value && value.trim()) {
+        entryMatch[`customFieldValues.${fieldId}`] = { $regex: value, $options: 'i' };
+      }
+    }
+  }
+
   const total = await JournalEntry.countDocuments(entryMatch);
   const entries = await JournalEntry.find(entryMatch)
     .sort({ date: -1 })
@@ -113,6 +133,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     total,
     hasMore: page * pageSize < total,
   });
+  } catch (e: any) {
+    console.error('[entries/search] error:', e?.message);
+    return res.status(500).json({ error: e?.message || 'Internal server error' });
+  }
 }
 
 export default withRateLimit(handler);

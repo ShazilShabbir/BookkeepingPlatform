@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Button, Input } from '@/components/ui';
 import toast from 'react-hot-toast';
 import type { InvoiceLineItem, InvoiceData } from '@/types/invoice';
-import { COMMON_CURRENCIES } from '@/lib/format';
+import { COMMON_CURRENCIES, getCurrencySymbol } from '@/lib/format';
 
 interface Props {
   onSuccess: () => void;
@@ -28,7 +28,8 @@ export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props)
     setLineItems(prev => {
       const items = prev.map((item, idx) => {
         if (idx !== i) return item;
-        const updated = { ...item, [field]: value };
+        const numVal = (field === 'quantity' || field === 'unitPrice') ? Math.max(0, Number(value) || 0) : value;
+        const updated = { ...item, [field]: numVal };
         if (field === 'quantity' || field === 'unitPrice') {
           updated.amount = (Number(updated.quantity) || 0) * (Number(updated.unitPrice) || 0);
         }
@@ -38,8 +39,8 @@ export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props)
     });
   }, []);
 
-  const addLine = () => setLineItems([...lineItems, { description: '', quantity: 1, unitPrice: 0, amount: 0 }]);
-  const removeLine = (i: number) => { if (lineItems.length > 1) setLineItems(lineItems.filter((_, idx) => idx !== i)); };
+  const addLine = () => setLineItems(prev => [...prev, { description: '', quantity: 1, unitPrice: 0, amount: 0 }]);
+  const removeLine = (i: number) => { setLineItems(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev); };
 
   const subtotal = lineItems.reduce((s, li) => s + li.amount, 0);
   const taxAmount = subtotal * (Number(taxRate) / 100);
@@ -140,7 +141,7 @@ export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props)
                 />
               </div>
               <div className="w-24 pt-2 text-right text-sm font-mono text-surface-700">
-                ${li.amount.toFixed(2)}
+                {getCurrencySymbol(currency)}{li.amount.toFixed(2)}
               </div>
               {lineItems.length > 1 && (
                 <button type="button" onClick={() => removeLine(i)} className="pt-2 text-surface-400 hover:text-red-500">
@@ -168,9 +169,9 @@ export default function InvoiceForm({ onSuccess, onCancel, editInvoice }: Props)
 
       <div className="border-t border-surface-200 pt-4">
         <div className="text-right space-y-1">
-          <p className="text-sm text-surface-500">Subtotal: <span className="font-mono">${subtotal.toFixed(2)}</span></p>
-          {taxRate > 0 && <p className="text-sm text-surface-500">Tax ({taxRate}%): <span className="font-mono">${taxAmount.toFixed(2)}</span></p>}
-          <p className="text-lg font-bold text-surface-900">Total: <span className="font-mono">${total.toFixed(2)}</span></p>
+          <p className="text-sm text-surface-500">Subtotal: <span className="font-mono">{getCurrencySymbol(currency)}{subtotal.toFixed(2)}</span></p>
+          {taxRate > 0 && <p className="text-sm text-surface-500">Tax ({taxRate}%): <span className="font-mono">{getCurrencySymbol(currency)}{taxAmount.toFixed(2)}</span></p>}
+          <p className="text-lg font-bold text-surface-900">Total: <span className="font-mono">{getCurrencySymbol(currency)}{total.toFixed(2)}</span></p>
         </div>
       </div>
 

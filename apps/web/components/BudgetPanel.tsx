@@ -39,6 +39,7 @@ export default function BudgetPanel({ userId }: { userId: string }) {
   const [budgets, setBudgets] = useState<BudgetItem[]>([]);
   const [actuals, setActuals] = useState<CategoryStat[]>([]);
   const [allAccounts, setAllAccounts] = useState<{ code: string; name: string }[]>([]);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -65,7 +66,10 @@ export default function BudgetPanel({ userId }: { userId: string }) {
       const accountsJson = await accountsRes.json();
 
       if (budgetJson.success) setBudgets(budgetJson.data);
-      if (summaryJson.success) setActuals(summaryJson.data.expensesByCategory || []);
+      if (summaryJson.success) {
+        setActuals(summaryJson.data.expensesByCategory || []);
+        if (summaryJson.data.baseCurrency) setBaseCurrency(summaryJson.data.baseCurrency);
+      }
       if (accountsJson.success) setAllAccounts(accountsJson.data || []);
     } catch (e) {
       console.error('BudgetPanel fetch error:', e);
@@ -210,12 +214,12 @@ export default function BudgetPanel({ userId }: { userId: string }) {
                           }}
                         />
                       ) : (
-                        <span className="text-surface-900">{formatCurrency(row.budget)}</span>
+                        <span className="text-surface-900">{formatCurrency(row.budget, baseCurrency)}</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-5 text-right text-surface-900">{formatCurrency(row.actual)}</td>
+                    <td className="py-2.5 px-5 text-right text-surface-900">{formatCurrency(row.actual, baseCurrency)}</td>
                     <td className={`py-2.5 px-5 text-right font-medium ${overBudget ? 'text-red-600' : variance >= 0 ? 'text-emerald-600' : 'text-surface-500'}`}>
-                      {variance >= 0 ? '+' : ''}{formatCurrency(variance)}
+                      {variance >= 0 ? '+' : ''}{formatCurrency(variance, baseCurrency)}
                     </td>
                     <td className="py-2.5 px-5 text-center">
                       {row.budget > 0 && (

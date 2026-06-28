@@ -31,7 +31,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { logo, primaryColor, companyName } = req.body;
     const update: Record<string, any> = {};
-    if (typeof logo === 'string') update.brandingLogo = logo;
+    if (typeof logo === 'string') {
+      if (logo && !logo.match(/^data:image\/(png|jpeg|svg\+xml);base64,.+/)) {
+        return res.status(400).json({ error: 'Invalid logo format. Must be a base64 data URL (PNG, JPEG, or SVG).' });
+      }
+      if (logo && logo.length > 1024 * 1024) {
+        return res.status(400).json({ error: 'Logo must be under 1MB.' });
+      }
+      update.brandingLogo = logo;
+    }
     if (typeof primaryColor === 'string') update.brandingPrimaryColor = primaryColor;
     if (typeof companyName === 'string') update.brandingCompanyName = companyName;
 

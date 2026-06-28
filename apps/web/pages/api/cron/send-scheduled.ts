@@ -52,9 +52,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const client = (schedule as any).clientId ? clientMap.get((schedule as any).clientId) : null;
         const shareLink = client ? `${process.env.NEXTAUTH_URL}/reports/${(client as any).accessToken}` : undefined;
 
-        const statements = await getFinancialStatements((schedule as any).userId);
+        const statements = await getFinancialStatements((schedule as any).userId, undefined, undefined, (user as any)?.baseCurrency || 'USD');
         const html = generateReportHTML(statements, ownerName, shareLink, branding);
-        const workbook = await generateWorkbook((schedule as any).userId, undefined, undefined, branding);
+        const workbook = await generateWorkbook((schedule as any).userId, undefined, undefined, branding, (user as any)?.baseCurrency || 'USD');
         const buffer = await workbook.xlsx.writeBuffer();
         const base64 = (buffer as any).toString('base64');
 

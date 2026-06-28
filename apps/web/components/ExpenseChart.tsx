@@ -9,12 +9,12 @@ interface ChartData {
   expenses: number;
 }
 
-const CustomTooltip = memo(({ active, payload, label }: TooltipProps<number, string>) => {
+const CustomTooltip = memo(({ active, payload, label, currency }: TooltipProps<number, string> & { currency?: string }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-surface-800 text-white px-4 py-3 rounded-lg shadow-elevated text-sm">
       <p className="text-surface-300 mb-1">{label}</p>
-      <p className="font-semibold text-red-400">{formatCurrency(payload[0].value ?? 0)}</p>
+      <p className="font-semibold text-red-400">{formatCurrency(payload[0].value ?? 0, currency)}</p>
     </div>
   );
 });
@@ -33,6 +33,7 @@ export default memo(function ExpenseChart({ userId, months = 12, onMonthClick }:
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError('');
@@ -41,7 +42,8 @@ export default memo(function ExpenseChart({ userId, months = 12, onMonthClick }:
       if (!res.ok) throw new Error('Failed to load');
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load');
-      setData(json.data);
+      setData(json.data || []);
+      if (json.baseCurrency) setBaseCurrency(json.baseCurrency);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error loading chart');
     } finally { setLoading(false); }
@@ -76,8 +78,8 @@ export default memo(function ExpenseChart({ userId, months = 12, onMonthClick }:
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} />
-            <Tooltip content={<CustomTooltip />} />
+            <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v, baseCurrency)} />
+            <Tooltip content={<CustomTooltip currency={baseCurrency} />} />
             <Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(e: any) => { if (onMonthClick && e?.activeLabel) onMonthClick(e.activeLabel); }} style={{ cursor: onMonthClick ? 'pointer' : 'default' }} />
           </BarChart>
         </ResponsiveContainer>

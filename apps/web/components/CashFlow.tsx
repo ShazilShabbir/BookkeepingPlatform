@@ -26,6 +26,7 @@ export default memo(function CashFlow() {
   const [endDate, setEndDate] = useState('');
   const [data, setData] = useState<CashFlowData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -38,6 +39,7 @@ export default memo(function CashFlow() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load cash flow');
       setData(json.data);
+      if (json.data?.baseCurrency) setBaseCurrency(json.data.baseCurrency);
     } catch (err: any) {
       toast.error(err.message || 'Failed to load cash flow');
     } finally {
@@ -88,7 +90,7 @@ export default memo(function CashFlow() {
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-base font-semibold text-surface-900">{section.title}</h3>
                     <span className={`text-lg font-bold ${section.total >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatCurrency(section.total)}
+                      {formatCurrency(section.total, baseCurrency)}
                     </span>
                   </div>
                   <div className="overflow-x-auto border border-surface-200 rounded-lg">
@@ -107,7 +109,7 @@ export default memo(function CashFlow() {
                               <span className="text-surface-900">{item.accountName}</span>
                             </td>
                             <td className={`py-2 px-4 text-right font-mono font-medium ${item.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {item.amount >= 0 ? formatCurrency(item.amount) : `(${formatCurrency(Math.abs(item.amount))})`}
+                              {item.amount >= 0 ? formatCurrency(item.amount, baseCurrency) : `(${formatCurrency(Math.abs(item.amount), baseCurrency)})`}
                             </td>
                           </tr>
                         ))}
@@ -127,7 +129,7 @@ export default memo(function CashFlow() {
                   </div>
                   <div className="text-right">
                     <p className={`text-2xl font-bold ${data.totalChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatCurrency(data.totalChange)}
+                      {formatCurrency(data.totalChange, baseCurrency)}
                     </p>
                   </div>
                 </div>

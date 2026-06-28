@@ -42,6 +42,7 @@ export default function CustomReportViewer({ report, userId, onBack }: CustomRep
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   const genData = useCallback(async () => {
     setLoading(true);
@@ -49,7 +50,10 @@ export default function CustomReportViewer({ report, userId, onBack }: CustomRep
     try {
       const res = await fetch(`/api/reports/custom/${report._id}/generate`, { method: 'POST' });
       const json = await res.json();
-      if (json.success) setData(json.data);
+      if (json.success) {
+        setData(json.data);
+        if (json.data?.baseCurrency) setBaseCurrency(json.data.baseCurrency);
+      }
       else setError(json.error || 'Generation failed');
     } catch {
       setError('Generation failed');
@@ -159,9 +163,9 @@ export default function CustomReportViewer({ report, userId, onBack }: CustomRep
 
       {data?.kpis && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card><div className="p-3"><p className="text-xs text-surface-500">Revenue</p><p className="text-lg font-semibold text-green-600">{formatCurrencyCompact(data.kpis.totalRevenue)}</p></div></Card>
-          <Card><div className="p-3"><p className="text-xs text-surface-500">Expenses</p><p className="text-lg font-semibold text-red-600">{formatCurrencyCompact(data.kpis.totalExpenses)}</p></div></Card>
-          <Card><div className="p-3"><p className="text-xs text-surface-500">Net Profit</p><p className={`text-lg font-semibold ${data.kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(data.kpis.netProfit)}</p></div></Card>
+          <Card><div className="p-3"><p className="text-xs text-surface-500">Revenue</p><p className="text-lg font-semibold text-green-600">{formatCurrencyCompact(data.kpis.totalRevenue, baseCurrency)}</p></div></Card>
+          <Card><div className="p-3"><p className="text-xs text-surface-500">Expenses</p><p className="text-lg font-semibold text-red-600">{formatCurrencyCompact(data.kpis.totalExpenses, baseCurrency)}</p></div></Card>
+          <Card><div className="p-3"><p className="text-xs text-surface-500">Net Profit</p><p className={`text-lg font-semibold ${data.kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(data.kpis.netProfit, baseCurrency)}</p></div></Card>
           <Card><div className="p-3"><p className="text-xs text-surface-500">Margin</p><p className="text-lg font-semibold text-surface-900">{data.kpis.profitMargin}%</p></div></Card>
         </div>
       )}
@@ -184,7 +188,7 @@ export default function CustomReportViewer({ report, userId, onBack }: CustomRep
                   {data.revenueByCategory.map((r: any) => (
                     <tr key={r.category} className="border-b border-surface-100">
                       <td className="py-2 text-surface-900">{r.category}</td>
-                      <td className="py-2 text-right text-green-600">{formatCurrencyCompact(r.amount)}</td>
+                      <td className="py-2 text-right text-green-600">{formatCurrencyCompact(r.amount, baseCurrency)}</td>
                       <td className="py-2 text-right text-surface-600">{r.count}</td>
                       <td className="py-2 text-right text-surface-600">{r.percentage}%</td>
                     </tr>
@@ -214,7 +218,7 @@ export default function CustomReportViewer({ report, userId, onBack }: CustomRep
                   {data.expensesByCategory.map((r: any) => (
                     <tr key={r.category} className="border-b border-surface-100">
                       <td className="py-2 text-surface-900">{r.category}</td>
-                      <td className="py-2 text-right text-red-600">{formatCurrencyCompact(r.amount)}</td>
+                      <td className="py-2 text-right text-red-600">{formatCurrencyCompact(r.amount, baseCurrency)}</td>
                       <td className="py-2 text-right text-surface-600">{r.count}</td>
                       <td className="py-2 text-right text-surface-600">{r.percentage}%</td>
                     </tr>
@@ -244,9 +248,9 @@ export default function CustomReportViewer({ report, userId, onBack }: CustomRep
                   {data.monthlyTrend.map((r: any) => (
                     <tr key={r.month} className="border-b border-surface-100">
                       <td className="py-2 text-surface-900">{r.month}</td>
-                      <td className="py-2 text-right text-green-600">{formatCurrencyCompact(r.revenue)}</td>
-                      <td className="py-2 text-right text-red-600">{formatCurrencyCompact(r.expenses)}</td>
-                      <td className={`py-2 text-right ${r.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(r.profit)}</td>
+                      <td className="py-2 text-right text-green-600">{formatCurrencyCompact(r.revenue, baseCurrency)}</td>
+                      <td className="py-2 text-right text-red-600">{formatCurrencyCompact(r.expenses, baseCurrency)}</td>
+                      <td className={`py-2 text-right ${r.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCompact(r.profit, baseCurrency)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -40,6 +40,7 @@ export interface JournalEntry {
   lineCount: number;
   createdAt: string;
   jobId?: string;
+  customFieldValues?: Record<string, any>;
 }
 
 export interface JournalLine {

@@ -6,6 +6,8 @@ import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
 import Invoice from '@/lib/models/Invoice';
+import User from '@/lib/models/User';
+import { getCurrencySymbol } from '@/lib/format';
 
 interface SearchResult {
   id: string;
@@ -38,6 +40,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const userId = session.user.email;
     const searchRegex = { $regex: query, $options: 'i' };
+
+    const userDoc = await User.findOne({ id: userId }).select('baseCurrency').lean().catch(() => null) as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
 
     // Search in parallel
     const [entries, accounts, invoices] = await Promise.all([
@@ -77,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 id: line.journalEntryId,
                 type: 'entry',
                 title: entry.description || line.description || 'Transaction',
-                subtitle: `${line.accountCode} · ${entry.date} · ${amount >= 0 ? '+' : ''}$${Math.abs(amount).toFixed(2)}`,
+                subtitle: `${line.accountCode} · ${entry.date} · ${amount >= 0 ? '+' : ''}${getCurrencySymbol(baseCurrency)}${Math.abs(amount).toFixed(2)}`,
                 href: '/dashboard?tab=transactions',
               });
             }
@@ -113,13 +118,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ],
       })
         .limit(limitNum)
-        .select('_id invoiceNumber customerName total status')
+        .select('_id invoiceNumber customerName total status currency')
         .lean()
         .then(results => results.map((r: any) => ({
           id: r._id.toString(),
           type: 'invoice' as const,
           title: `Invoice ${r.invoiceNumber}`,
-          subtitle: `${r.customerName || 'No customer'} · $${(r.total || 0).toFixed(2)} · ${r.status || 'draft'}`,
+          subtitle: `${r.customerName || 'No customer'} · ${getCurrencySymbol(r.currency || 'USD')}${(r.total || 0).toFixed(2)} · ${r.status || 'draft'}`,
           href: '/dashboard?tab=invoices',
         }))),
     ]);

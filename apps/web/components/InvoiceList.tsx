@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button, Badge, Input, EmptyState, TableSkeleton } from '@/components/ui';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDetail from '@/components/InvoiceDetail';
 import toast from 'react-hot-toast';
 import type { InvoiceData, InvoiceStatus } from '@/types/invoice';
+import { getCurrencySymbol } from '@/lib/format';
 
 const STATUS_BADGE: Record<InvoiceStatus, { variant: 'success' | 'warning' | 'danger' | 'info' | 'default'; label: string }> = {
   draft: { variant: 'default', label: 'Draft' },
@@ -18,6 +19,8 @@ export default function InvoiceList({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showForm, setShowForm] = useState(false);
@@ -25,12 +28,18 @@ export default function InvoiceList({ userId }: { userId: string }) {
   const [sortKey, setSortKey] = useState<string>('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => { setDebouncedSearch(value); setPage(1); }, 300);
+  }, []);
+
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (search) params.set('search', search);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       const res = await fetch(`/api/invoices?${params}`);
       const json = await res.json();
       if (json.success) {
@@ -39,7 +48,7 @@ export default function InvoiceList({ userId }: { userId: string }) {
       }
     } catch { /* ignore */ }
     setLoading(false);
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, debouncedSearch]);
 
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
 
@@ -53,6 +62,33 @@ export default function InvoiceList({ userId }: { userId: string }) {
         fetchInvoices();
       } else toast.error(json.error || 'Failed to delete');
     } catch { toast.error('Failed to delete'); }
+  };
+
+  const handleQuickSend = async (id: string) => {
+    if (!confirm('Send this invoice to the client?')) return;
+    try {
+      const res = await fetch(`/api/invoices/${id}/send`, { method: 'POST' });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Invoice sent');
+        fetchInvoices();
+      } else toast.error(json.error || 'Failed to send');
+    } catch { toast.error('Failed to send'); }
+  };
+
+  const handleMarkPaid = async (id: string) => {
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark-paid' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Invoice marked as paid');
+        fetchInvoices();
+      } else toast.error(json.error || 'Failed to mark as paid');
+    } catch { toast.error('Failed to mark as paid'); }
   };
 
   const handleSort = (key: string) => {
@@ -100,7 +136,7 @@ export default function InvoiceList({ userId }: { userId: string }) {
         <Input
           placeholder="Search invoices..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className="sm:max-w-xs"
         />
       </div>
@@ -144,18 +180,30 @@ export default function InvoiceList({ userId }: { userId: string }) {
                     <td className="py-3 px-3 text-surface-700">{inv.clientName}</td>
                     <td className="py-3 px-3 text-surface-500">{new Date(inv.issueDate).toLocaleDateString()}</td>
                     <td className="py-3 px-3 text-surface-500">{new Date(inv.dueDate).toLocaleDateString()}</td>
-                    <td className="py-3 px-3 text-right font-mono font-medium text-surface-900">${inv.total.toFixed(2)}</td>
+                    <td className="py-3 px-3 text-right font-mono font-medium text-surface-900">{getCurrencySymbol(inv.currency)}{inv.total.toFixed(2)}</td>
                     <td className="py-3 px-3 text-center">
                       <Badge variant={STATUS_BADGE[inv.status].variant}>{STATUS_BADGE[inv.status].label}</Badge>
                     </td>
                     <td className="py-3 px-3 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {inv.status === 'draft' && (
+                          <button onClick={() => handleQuickSend(inv._id)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-blue-600 rounded-lg hover:bg-surface-100" title="Send">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                          </button>
+                        )}
+                        {(inv.status === 'sent' || inv.status === 'overdue') && (
+                          <button onClick={() => handleMarkPaid(inv._id)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-emerald-600 rounded-lg hover:bg-surface-100" title="Mark as Paid">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                        )}
                         <button onClick={() => setSelected(inv)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-surface-600 rounded-lg hover:bg-surface-100" title="View">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         </button>
-                        <button onClick={() => handleDelete(inv._id)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-600 rounded-lg hover:bg-surface-100" title="Delete">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        {inv.status === 'draft' && (
+                          <button onClick={() => handleDelete(inv._id)} className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-600 rounded-lg hover:bg-surface-100" title="Delete">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

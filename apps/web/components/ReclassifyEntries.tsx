@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, Button, Input, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/format';
 
 type Account = {
   _id: string;
@@ -47,6 +48,7 @@ export default function ReclassifyEntries({ userId }: { userId: string }) {
   const [pickValue, setPickValue] = useState('');
   const [pickSearch, setPickSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
   const pickRef = useRef<HTMLDivElement>(null);
 
   const loadEntries = useCallback(async (pageNum: number, append: boolean, searchTerm: string) => {
@@ -81,7 +83,14 @@ export default function ReclassifyEntries({ userId }: { userId: string }) {
     }
   };
 
-  useEffect(() => { loadEntries(1, false, ''); loadAccounts(); }, []);
+  useEffect(() => {
+    loadEntries(1, false, '');
+    loadAccounts();
+    fetch('/api/subscription?userId=' + encodeURIComponent(userId))
+      .then(r => r.json())
+      .then(json => { if (json.success && json.data?.baseCurrency) setBaseCurrency(json.data.baseCurrency); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -208,7 +217,7 @@ export default function ReclassifyEntries({ userId }: { userId: string }) {
                             <span className="text-sm font-mono font-medium text-surface-700 w-20 shrink-0">{line.accountCode}</span>
                             <span className="text-xs text-surface-500 truncate flex-1">{account?.name || 'Unknown account'}</span>
                             <span className="text-sm font-mono text-surface-700 shrink-0">
-                              {line.debit > 0 ? `$${line.debit.toFixed(2)} Dr` : line.credit > 0 ? `$${line.credit.toFixed(2)} Cr` : '-'}
+                              {line.debit > 0 ? `${formatCurrency(line.debit, baseCurrency)} Dr` : line.credit > 0 ? `${formatCurrency(line.credit, baseCurrency)} Cr` : '-'}
                             </span>
                           </div>
                           <div className="relative shrink-0 ml-3">

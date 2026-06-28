@@ -4,6 +4,8 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
+import { convertJournalLines } from '@/lib/currency';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -12,6 +14,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const uid = token.sub as string;
 
   await dbConnect();
+
+  const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+  const baseCurrency = userDoc?.baseCurrency || 'USD';
 
   const { type, startDate, endDate, month, category, accountCode, entryId, page = '1', limit = '25' } = req.query;
   const pg = Math.max(1, parseInt(page as string, 10) || 1);
@@ -25,14 +30,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (endDate) dateFilter.$lte = endDate;
     if (startDate || endDate) matchUser.date = dateFilter;
 
+    const allAccounts = await Account.find({ userId: uid, isActive: true }).lean();
+    const currencyMap = new Map(allAccounts.map(a => [a.code, { currency: (a as any).currency || 'USD' }]));
+
     if (type === 'revenue' || type === 'expenses') {
       const entries = await JournalEntry.find(matchUser).select('_id date').lean();
       const entryIds = entries.map(e => (e as any)._id.toString());
-      const accounts = await Account.find({ userId: uid, type: type === 'revenue' ? 'revenue' : 'expense', isActive: true }).lean();
-      const accMap = new Map(accounts.map(a => [a.code, a.name]));
+      const accMap = new Map(allAccounts.filter(a => a.type === (type === 'revenue' ? 'revenue' : 'expense')).map(a => [a.code, a.name]));
       const accCodes = [...accMap.keys()];
 
-      const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid, accountCode: { $in: accCodes } }).lean();
+      const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid, accountCode: { $in: accCodes } }).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
       const breakdown = new Map<string, { amount: number; count: number }>();
       for (const line of lines) {
         const name = accMap.get(line.accountCode) || line.accountCode;
@@ -45,15 +53,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const result = Array.from(breakdown.entries())
         .map(([name, data]) => ({ category: name, amount: Math.round(data.amount * 100) / 100, count: data.count, percentage: total > 0 ? Math.round((Math.abs(data.amount) / total) * 1000) / 10 : 0 }))
         .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-      return res.status(200).json({ success: true, data: { breakdown: result, total: Math.round(Array.from(breakdown.values()).reduce((s, v) => s + v.amount, 0) * 100) / 100 } });
+      return res.status(200).json({ success: true, data: { breakdown: result, total: Math.round(Array.from(breakdown.values()).reduce((s, v) => s + v.amount, 0) * 100) / 100, baseCurrency } });
     }
 
     if (type === 'net-profit') {
       const entries = await JournalEntry.find(matchUser).select('_id date').lean();
       const entryIds = entries.map(e => (e as any)._id.toString());
-      const acc = await Account.find({ userId: uid, isActive: true }).lean();
-      const accMap = new Map(acc.map(a => [a.code, a]));
-      const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+      const accMap = new Map(allAccounts.map(a => [a.code, a]));
+      const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
       let revenue = 0, expenses = 0;
       for (const line of lines) {
         const info = accMap.get(line.accountCode);
@@ -65,15 +73,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       revenue = Math.round(revenue * 100) / 100;
       expenses = Math.round(expenses * 100) / 100;
       const netProfit = Math.round((revenue - expenses) * 100) / 100;
-      return res.status(200).json({ success: true, data: { revenue, expenses, netProfit, margin: revenue > 0 ? Math.round((netProfit / revenue) * 1000) / 10 : 0 } });
+      return res.status(200).json({ success: true, data: { revenue, expenses, netProfit, margin: revenue > 0 ? Math.round((netProfit / revenue) * 1000) / 10 : 0, baseCurrency } });
     }
 
     if (type === 'profit-margin') {
       const entries = await JournalEntry.find(matchUser).sort({ date: 1 }).select('_id date').lean();
       const entryIds = entries.map(e => (e as any)._id.toString());
-      const acc = await Account.find({ userId: uid, isActive: true }).lean();
-      const accMap = new Map(acc.map(a => [a.code, a]));
-      const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+      const accMap = new Map(allAccounts.map(a => [a.code, a]));
+      const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
       const byMonth = new Map<string, { revenue: number; expenses: number }>();
       for (const entry of entries) {
         const month = (entry as any).date?.slice(0, 7);
@@ -95,21 +103,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         month: m,
         margin: d.revenue > 0 ? Math.round(((d.revenue - d.expenses) / d.revenue) * 1000) / 10 : 0,
       }));
-      return res.status(200).json({ success: true, data: { monthly } });
+      return res.status(200).json({ success: true, data: { monthly, baseCurrency } });
     }
 
     if (type === 'cash-balance') {
-      const cashAccounts = await Account.find({ userId: uid, code: /^1(0|1)\d{2}$/, isActive: true }).lean();
+      const cashAccounts = allAccounts.filter(a => /^1(0|1)\d{2}$/.test(a.code));
       const cashCodes = cashAccounts.map(a => a.code);
-      const lines = await JournalLine.aggregate([
+      const aggregated = await JournalLine.aggregate([
         { $match: { userId: uid, accountCode: { $in: cashCodes } } },
         { $group: { _id: '$accountCode', totalDebit: { $sum: '$debit' }, totalCredit: { $sum: '$credit' } } },
       ]);
+      const { convertAmount } = await import('@/lib/currency');
       const balanceMap = new Map<string, number>();
-      for (const l of lines) balanceMap.set(l._id, Math.round((l.totalDebit - l.totalCredit) * 100) / 100);
+      for (const l of aggregated) {
+        const fromCurrency = currencyMap.get(l._id)?.currency || 'USD';
+        const rawBalance = l.totalDebit - l.totalCredit;
+        if (fromCurrency === baseCurrency) {
+          balanceMap.set(l._id, Math.round(rawBalance * 100) / 100);
+        } else {
+          const absConverted = await convertAmount(uid, Math.abs(rawBalance), fromCurrency, baseCurrency);
+          balanceMap.set(l._id, Math.round((rawBalance < 0 ? -absConverted : absConverted) * 100) / 100);
+        }
+      }
       const result = cashAccounts.map(a => ({ accountCode: a.code, accountName: a.name, balance: balanceMap.get(a.code) || 0 }));
       const total = Math.round(result.reduce((s, r) => s + r.balance, 0) * 100) / 100;
-      return res.status(200).json({ success: true, data: { accounts: result, total } });
+      return res.status(200).json({ success: true, data: { accounts: result, total, baseCurrency } });
     }
 
     if (type === 'entries' || type === 'month-revenue' || type === 'month-expense') {
@@ -124,9 +142,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (type === 'month-revenue' || type === 'month-expense') {
         const entryIds = entries.map(e => (e as any)._id.toString());
-        const acc = await Account.find({ userId: uid, type: type === 'month-revenue' ? 'revenue' : 'expense', isActive: true }).lean();
+        const acc = allAccounts.filter(a => a.type === (type === 'month-revenue' ? 'revenue' : 'expense'));
         const accCodes = new Set(acc.map(a => a.code));
-        const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid, accountCode: { $in: [...accCodes] } }).lean();
+        const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid, accountCode: { $in: [...accCodes] } }).lean();
+        const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
         const lineTotals = new Map<string, number>();
         for (const line of lines) {
           const curr = lineTotals.get(line.journalEntryId) || 0;
@@ -135,19 +154,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         resultEntries = resultEntries.map(e => ({ ...e, amount: Math.round((lineTotals.get(e._id) || 0) * 100) / 100 }));
       }
 
-      return res.status(200).json({ success: true, data: { entries: resultEntries, total: totalCount, page: pg, totalPages: Math.ceil(totalCount / lim) } });
+      return res.status(200).json({ success: true, data: { entries: resultEntries, total: totalCount, page: pg, totalPages: Math.ceil(totalCount / lim), baseCurrency } });
     }
 
     if (type === 'category-detail') {
       const cat = category as string;
-      const acc = await Account.find({ userId: uid, isActive: true }).lean();
-      const accMap = new Map(acc.map(a => [a.code, a]));
-      const catAccount = acc.find(a => a.name === cat);
+      const accMap = new Map(allAccounts.map(a => [a.code, a]));
+      const catAccount = allAccounts.find(a => a.name === cat);
       if (!catAccount) return res.status(404).json({ success: false, error: 'Category not found' });
 
       const entries = await JournalEntry.find(matchUser).select('_id date').lean();
       const entryIds = entries.map(e => (e as any)._id.toString());
-      const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid, accountCode: { $regex: catAccount.type === 'revenue' ? '^4' : '^5' } }).lean();
+      const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid, accountCode: { $regex: catAccount.type === 'revenue' ? '^4' : '^5' } }).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
       const accTotals = new Map<string, { amount: number; count: number }>();
       for (const line of lines) {
         const info = accMap.get(line.accountCode);
@@ -161,25 +180,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const result = Array.from(accTotals.entries())
         .map(([code, data]) => ({ accountCode: code, accountName: accMap.get(code)?.name || code, amount: Math.round(data.amount * 100) / 100, count: data.count, percentage: total > 0 ? Math.round((Math.abs(data.amount) / total) * 1000) / 10 : 0 }))
         .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-      return res.status(200).json({ success: true, data: { accounts: result, total: Math.round(Array.from(accTotals.values()).reduce((s, v) => s + v.amount, 0) * 100) / 100 } });
+      return res.status(200).json({ success: true, data: { accounts: result, total: Math.round(Array.from(accTotals.values()).reduce((s, v) => s + v.amount, 0) * 100) / 100, baseCurrency } });
     }
 
     if (type === 'entry-detail') {
       const eid = entryId as string;
       const entry = await JournalEntry.findById(eid).lean();
       if (!entry || (entry as any).userId !== uid) return res.status(404).json({ error: 'Entry not found' });
-      const acc = await Account.find({ userId: uid, isActive: true }).lean();
-      const accMap = new Map(acc.map(a => [a.code, a]));
-      const lines = await JournalLine.find({ journalEntryId: eid, userId: uid }).lean();
+      const accMap = new Map(allAccounts.map(a => [a.code, a]));
+      const rawLines = await JournalLine.find({ journalEntryId: eid, userId: uid }).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
       const lineDetails = lines.map(l => ({ accountCode: l.accountCode, accountName: accMap.get(l.accountCode)?.name || l.accountCode, debit: l.debit || 0, credit: l.credit || 0, description: l.description || '' }));
-      return res.status(200).json({ success: true, data: { entry: { _id: (entry as any)._id.toString(), date: (entry as any).date, description: (entry as any).description || '' }, lines: lineDetails } });
+      return res.status(200).json({ success: true, data: { entry: { _id: (entry as any)._id.toString(), date: (entry as any).date, description: (entry as any).description || '' }, lines: lineDetails, baseCurrency } });
     }
 
     if (type === 'account-journal') {
       const ac = accountCode as string;
-      const accountInfo = await Account.findOne({ userId: uid, code: ac }).lean();
+      const accountInfo = allAccounts.find(a => a.code === ac);
       if (!accountInfo) return res.status(404).json({ error: 'Account not found' });
-      const lines = await JournalLine.find({ userId: uid, accountCode: ac }).sort({ _id: -1 }).skip(skip).limit(lim).lean();
+      const rawLines = await JournalLine.find({ userId: uid, accountCode: ac }).sort({ _id: -1 }).skip(skip).limit(lim).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
       const entryIds = lines.map(l => l.journalEntryId);
       const entries = await JournalEntry.find({ _id: { $in: entryIds }, userId: uid }).select('date description').lean();
       const entryMap = new Map(entries.map(e => [(e as any)._id.toString(), e]));
@@ -188,7 +208,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const e = entryMap.get(l.journalEntryId);
         return { date: (e as any)?.date || '', description: (e as any)?.description || l.description || '', debit: l.debit || 0, credit: l.credit || 0, balance: Math.round(((l.debit || 0) - (l.credit || 0)) * 100) / 100 };
       });
-      return res.status(200).json({ success: true, data: { accountInfo: { code: (accountInfo as any).code, name: (accountInfo as any).name, type: (accountInfo as any).type }, lines: result, total: totalCount, page: pg, totalPages: Math.ceil(totalCount / lim) } });
+      return res.status(200).json({ success: true, data: { accountInfo: { code: (accountInfo as any).code, name: (accountInfo as any).name, type: (accountInfo as any).type }, lines: result, total: totalCount, page: pg, totalPages: Math.ceil(totalCount / lim), baseCurrency } });
     }
 
     return res.status(400).json({ error: 'Invalid type' });

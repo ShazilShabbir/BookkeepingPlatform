@@ -4,8 +4,11 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
 import { linearRegression } from '@/lib/forecast';
+import { formatCurrency } from '@/lib/format';
+import { convertJournalLines } from '@/lib/currency';
 
 interface TrendPoint {
   month: string;
@@ -26,9 +29,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = await resolveUserIdFromQuery(token, req);
 
-  await dbConnect();
+    await dbConnect();
 
-  try {
+    const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
+    try {
     const { startDate: sdParam, endDate: edParam } = req.query;
     let dateFilter: Record<string, any>;
     if (sdParam || edParam) {
@@ -48,7 +54,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
     const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
     const accountMap = new Map<string, string>();
-    for (const a of accountDocs) accountMap.set(a.code, a.type);
+    const currencyMap = new Map<string, { currency?: string }>();
+    for (const a of accountDocs) {
+      accountMap.set(a.code, a.type);
+      currencyMap.set(a.code, { currency: (a as any).currency || 'USD' });
+    }
+
+    const convertedLines = await convertJournalLines(uid, lines, currencyMap, baseCurrency);
 
     const monthlyData = new Map<string, { revenue: number; expenses: number }>();
 
@@ -58,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!monthlyData.has(month)) monthlyData.set(month, { revenue: 0, expenses: 0 });
     }
 
-    for (const line of lines) {
+    for (const line of convertedLines) {
       const entry = entries.find(e => (e as any)._id.toString() === line.journalEntryId);
       if (!entry) continue;
       const month = (entry as any).date?.slice(0, 7);
@@ -125,14 +137,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       {
         type: 'revenue_peak',
         label: 'Highest Revenue Month',
-        detail: `${bestRevenueMonth.month} had the highest revenue at $${bestRevenueMonth.revenue.toLocaleString()}.`,
+        detail: `${bestRevenueMonth.month} had the highest revenue at ${formatCurrency(bestRevenueMonth.revenue, baseCurrency)}.`,
         value: bestRevenueMonth.revenue,
         icon: 'trending_up',
       },
       {
         type: 'revenue_trend',
         label: 'Revenue Trend',
-        detail: `Revenue is trending ${trendDir(revForecast.slope)} (slope: ${Math.round(revForecast.slope * 100) / 100}/mo). Next quarter projection: $${Math.round(revForecast.projected.reduce((a, b) => a + b, 0)).toLocaleString()}.`,
+        detail: `Revenue is trending ${trendDir(revForecast.slope)} (slope: ${Math.round(revForecast.slope * 100) / 100}/mo). Next quarter projection: ${formatCurrency(Math.round(revForecast.projected.reduce((a, b) => a + b, 0)), baseCurrency)}.`,
         value: revForecast.slope,
         icon: 'show_chart',
       },
@@ -146,28 +158,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       {
         type: 'profit_peak',
         label: 'Best Month',
-        detail: `${bestProfitMonth.month} was the most profitable at $${bestProfitMonth.profit.toLocaleString()}.`,
+        detail: `${bestProfitMonth.month} was the most profitable at ${formatCurrency(bestProfitMonth.profit, baseCurrency)}.`,
         value: bestProfitMonth.profit,
         icon: 'emoji_events',
       },
       {
         type: 'profit_low',
         label: 'Worst Month',
-        detail: `${worstProfitMonth.month} had the lowest profit at $${worstProfitMonth.profit.toLocaleString()}.`,
+        detail: `${worstProfitMonth.month} had the lowest profit at ${formatCurrency(worstProfitMonth.profit, baseCurrency)}.`,
         value: worstProfitMonth.profit,
         icon: 'warning',
       },
       {
         type: 'avg_profit',
         label: 'Average Monthly Profit',
-        detail: `Average monthly profit over ${months.length} months: $${avgProfit.toLocaleString()}.`,
+        detail: `Average monthly profit over ${months.length} months: ${formatCurrency(avgProfit, baseCurrency)}.`,
         value: avgProfit,
         icon: 'bar_chart',
       },
       ...anomalies.slice(0, 3).map(a => ({
         type: 'anomaly' as string,
         label: `${a.type === 'revenue' ? 'Revenue' : 'Expense'} Spike`,
-        detail: `${a.month} had ${a.type} of $${Math.round(a.value).toLocaleString()}, ${a.deviation}x the average.`,
+        detail: `${a.month} had ${a.type} of ${formatCurrency(Math.round(a.value), baseCurrency)}, ${a.deviation}x the average.`,
         value: a.value,
         icon: 'bolt' as string,
       })),

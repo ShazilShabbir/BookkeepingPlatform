@@ -3,7 +3,9 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 import { generateCashFlowReport } from '@/lib/reports';
+import { convertJournalLines } from '@/lib/currency';
 
 export interface BrandingOptions {
   logo?: string;
@@ -35,7 +37,6 @@ function applyBranding(b: BrandingOptions | undefined) {
   if (!b?.primaryColor) return;
   const c = b.primaryColor.replace('#', '');
   palette.brand = 'FF' + c.toUpperCase();
-  // derive darker/lighter shades (simplified)
   palette.brandDark = palette.brand;
   palette.brandLight = 'FF' + c.toUpperCase() + '66';
 }
@@ -78,10 +79,41 @@ function setupSheet(sheet: ExcelJS.Worksheet, columns: Partial<ExcelJS.Column>[]
   if (tabColor) sheet.properties.tabColor = { argb: tabColor };
 }
 
-// SVG infographic generation removed — SVG cannot be embedded via ExcelJS addImage.
-// The Final Summary sheet below uses styled cell-based KPI cards instead.
+function addPrintSetup(sheet: ExcelJS.Worksheet) {
+  sheet.pageSetup = {
+    orientation: 'landscape',
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    paperSize: 9,
+    margins: { left: 0.5, right: 0.5, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+  };
+}
 
-export async function generateWorkbook(uid: string, startDate?: string | null, endDate?: string | null, branding?: BrandingOptions): Promise<ExcelJS.Workbook> {
+function formatDateRange(startDate?: string | null, endDate?: string | null): string {
+  if (!startDate && !endDate) return 'Full Period';
+  const fmt = (d: string) => {
+    const [y, m, d2] = d.split('-');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[parseInt(m) - 1]} ${parseInt(d2)}, ${y}`;
+  };
+  if (startDate && endDate) return `Period: ${fmt(startDate)} – ${fmt(endDate)}`;
+  if (startDate) return `Period: ${fmt(startDate)} – Present`;
+  return `Period: Through ${fmt(endDate!)}`;
+}
+
+function addPeriodSubtitle(sheet: ExcelJS.Worksheet, startDate?: string | null, endDate?: string | null) {
+  const text = formatDateRange(startDate, endDate);
+  const lastCol = sheet.columnCount;
+  const r = sheet.getRow(2);
+  r.getCell(1).value = text;
+  r.getCell(1).font = { italic: true, color: { argb: palette.muted }, size: 10, name: 'Calibri' };
+  r.height = 18;
+  if (lastCol > 1) sheet.mergeCells(2, 1, 2, lastCol);
+  sheet.views = [{ state: 'frozen', ySplit: 2 }];
+}
+
+export async function generateWorkbook(uid: string, startDate?: string | null, endDate?: string | null, branding?: BrandingOptions, baseCurrency: string = 'USD'): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
   wb.creator = branding?.companyName || 'BookKeep';
   wb.created = new Date();
@@ -96,17 +128,19 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
 
   const entriesData = await JournalEntry.find(query).sort({ date: -1 }).lean();
   const entryIds = entriesData.map(e => (e._id as string).toString());
-  const entriesMap = new Map(entriesData.map(e => [(e._id as string).toString(), e]));
 
   const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
   const accountMap = new Map<string, AccountInfo>();
   const accountNameMap = new Map<string, string>();
+  const currencyMap = new Map<string, { currency?: string }>();
   for (const a of accountDocs) {
     accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
     accountNameMap.set(a.code, a.name);
+    currencyMap.set(a.code, { currency: (a as any).currency || 'USD' });
   }
 
-  const allLines = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }).lean();
+  const rawAllLines = await JournalLine.find({ userId: uid, journalEntryId: { $in: entryIds } }).lean();
+  const allLines = await convertJournalLines(uid, rawAllLines, currencyMap, baseCurrency);
   const accountTotals = new Map<string, { debits: number; credits: number }>();
   for (const data of allLines) {
     const code = data.accountCode;
@@ -116,6 +150,10 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     totals.credits += data.credit || 0;
     accountTotals.set(code, totals);
   }
+
+  // Load custom field definitions for export
+  const userDoc = await User.findOne({ email: uid }).lean();
+  const customFieldDefs: { id: string; label: string }[] = (userDoc as any)?.customFields || (userDoc as any)?.csvProfiles?.[0]?.customFields || [];
 
   // Compute per-entry monthly data for trends
   const monthlyTotals = new Map<string, { revenue: number; expenses: number }>();
@@ -144,7 +182,6 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   // ── Build account-type sections ──
   const typeLabels: Record<string, string> = { revenue: 'Revenue', expense: 'Expenses', asset: 'Assets', liability: 'Liabilities', equity: 'Equity' };
   const typeColors: Record<string, string> = { revenue: palette.revenueBg, expense: palette.expenseBg, asset: palette.assetBg, liability: palette.liabilityBg, equity: palette.equityBg };
-  const typeCodes: Record<string, string> = { revenue: palette.revenue, expense: palette.expense, asset: palette.asset, liability: palette.liability, equity: palette.equity };
 
   const buildSections = (types: string[]) => {
     const sections: { title: string; type: string; total: number; accounts: { code: string; name: string; balance: number }[] }[] = [];
@@ -184,6 +221,27 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   const totalAssets = bsSections.find(s => s.type === 'asset')?.total || 0;
   const totalLiabilities = bsSections.find(s => s.type === 'liability')?.total || 0;
   const totalEquity = bsSections.find(s => s.type === 'equity')?.total || 0;
+  const balOk = Math.abs(totalAssets - totalLiabilities - totalEquity) < 0.01;
+
+  // ── Compute quarterly data (EX-4) ──
+  const quarterlyData = new Map<string, { revenue: number; expenses: number }>();
+  for (const [month, data] of monthlyTotals) {
+    const qNum = Math.ceil(parseInt(month.slice(5, 7)) / 3);
+    const year = month.slice(0, 4);
+    const qKey = `${year} Q${qNum}`;
+    const q = quarterlyData.get(qKey) || { revenue: 0, expenses: 0 };
+    q.revenue += data.revenue;
+    q.expenses += data.expenses;
+    quarterlyData.set(qKey, q);
+  }
+
+  // ── Pre-group lines by entry for sheets that need them ──
+  const linesByEntryId = new Map<string, any[]>();
+  for (const line of allLines) {
+    const existing = linesByEntryId.get(line.journalEntryId) || [];
+    existing.push(line);
+    linesByEntryId.set(line.journalEntryId, existing);
+  }
 
   // Write section helper
   const writeSection = (sheet: ExcelJS.Worksheet, section: typeof plSections[0], startRow: number) => {
@@ -216,11 +274,137 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   };
 
   // ================================================================
-  // Sheet 1: Profit & Loss
+  // Sheet 1: Final Summary (moved to front, EX-1)
+  // ================================================================
+  const sm = wb.addWorksheet('Final Summary');
+  sm.columns = [{ header: 'Metric', key: 'm', width: 28 }, { header: 'Value', key: 'v', width: 24 }];
+  sm.views = [{ state: 'frozen', ySplit: 2 }];
+  sm.properties.tabColor = { argb: palette.brand };
+  addPrintSetup(sm);
+
+  // Logo embedding (EX-2)
+  let smDataRow = 2;
+  if (branding?.logo) {
+    try {
+      const logoData = branding.logo;
+      const isDataUrl = logoData.startsWith('data:');
+      const ext = (isDataUrl ? (logoData.match(/data:image\/(\w+)/)?.[1] || 'png') : (logoData.split('.').pop() || 'png')) as 'png' | 'jpeg' | 'gif';
+      const base64 = isDataUrl ? logoData.split(',')[1] : logoData;
+      const imageId = wb.addImage({ base64, extension: ext });
+      sm.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 50 } });
+      sm.getRow(1).height = 40;
+    } catch { /* skip broken logo */ }
+  }
+
+  // Title
+  const titleCol = branding?.logo ? 3 : 1;
+  sm.getRow(1).getCell(titleCol).value = 'Final Summary';
+  sm.getRow(1).getCell(titleCol).font = { bold: true, color: { argb: palette.white }, size: 14, name: 'Calibri' };
+  sm.getRow(1).getCell(titleCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.brandDark } };
+  const titleEndCol = branding?.logo ? 2 : 2;
+  sm.getRow(1).getCell(titleEndCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.brandDark } };
+  sm.getRow(1).getCell(2).style = sm.getRow(1).getCell(1).style;
+
+  // Date range subtitle (EX-9)
+  const periodText = formatDateRange(startDate, endDate);
+  sm.getRow(2).getCell(1).value = periodText;
+  sm.getRow(2).getCell(1).font = { italic: true, color: { argb: palette.muted }, size: 10, name: 'Calibri' };
+  sm.getRow(2).getCell(2).font = sm.getRow(2).getCell(1).font;
+  sm.getRow(2).height = 18;
+  sm.mergeCells('A2:B2');
+
+  sm.getRow(3).getCell(1).value = `Base Currency: ${baseCurrency}`;
+  sm.getRow(3).getCell(1).font = { italic: true, color: { argb: palette.muted }, size: 10, name: 'Calibri' };
+  sm.getRow(3).height = 18;
+  sm.mergeCells('A3:B3');
+
+  smDataRow = 5; // KPI data starts at row 5
+  const kpiData = [
+    { label: 'Total Revenue', value: revenueTotal, color: palette.accentGreen, bg: palette.revenueBg },
+    { label: 'Total Expenses', value: expenseTotal, color: palette.accentRed, bg: palette.expenseBg },
+    { label: 'Net Income', value: netIncome, color: netIncome >= 0 ? palette.accentGreen : palette.accentRed, bg: netIncome >= 0 ? palette.revenueBg : palette.expenseBg },
+    { label: 'Profit Margin', value: revenueTotal > 0 ? `${((netIncome / revenueTotal) * 100).toFixed(1)}%` : '0.0%', color: palette.brand, bg: palette.brandLight },
+    { label: '', value: '', color: '', bg: '' },
+    { label: 'Total Assets', value: totalAssets, color: palette.asset, bg: palette.assetBg },
+    { label: 'Total Liabilities', value: totalLiabilities, color: palette.liability, bg: palette.liabilityBg },
+    { label: 'Total Equity', value: totalEquity, color: palette.equity, bg: palette.equityBg },
+    { label: 'Balance Check', value: balOk ? '✓ Balanced' : '⚠ Out of balance', color: balOk ? palette.accentGreen : palette.accentRed, bg: balOk ? palette.revenueBg : palette.expenseBg },
+  ];
+
+  for (const k of kpiData) {
+    if (!k.label) { smDataRow++; continue; }
+    const rr = sm.getRow(smDataRow);
+    rr.getCell(1).value = k.label;
+    rr.getCell(1).font = { bold: true, size: 12, color: { argb: palette.dark }, name: 'Calibri' };
+    rr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: k.bg } };
+    rr.getCell(2).value = typeof k.value === 'number' ? k.value : k.value;
+    if (typeof k.value === 'number') rr.getCell(2).numFmt = fmtCurrency;
+    rr.getCell(2).font = { bold: true, size: 14, color: { argb: k.color }, name: 'Calibri' };
+    rr.getCell(2).alignment = { horizontal: 'right' };
+    rr.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: k.bg } };
+    rr.height = 28;
+    smDataRow++;
+  }
+
+  // ================================================================
+  // Sheet 2: Quarterly Summary (EX-4, NEW)
+  // ================================================================
+  const sortedQuarters = Array.from(quarterlyData.keys()).sort();
+  if (sortedQuarters.length > 0) {
+    const qs = wb.addWorksheet('Quarterly Summary');
+    setupSheet(qs, [
+      { header: 'Quarter', key: 'q', width: 14 },
+      { header: 'Revenue', key: 'r', width: 20 },
+      { header: 'Expenses', key: 'e', width: 20 },
+      { header: 'Net Income', key: 'n', width: 20 },
+      { header: '% Change', key: 'pct', width: 14 },
+    ], palette.accentGreen);
+    addPeriodSubtitle(qs, startDate, endDate);
+    addPrintSetup(qs);
+
+    let qRow = 3;
+    let prevNet = 0;
+    sortedQuarters.forEach((qKey, idx) => {
+      const q = quarterlyData.get(qKey)!;
+      const net = Math.round((q.revenue - q.expenses) * 100) / 100;
+      const rr = qs.getRow(qRow);
+      rr.getCell(1).value = qKey; rr.getCell(1).font = { bold: true, name: 'Calibri' };
+      rr.getCell(2).value = Math.round(q.revenue * 100) / 100; rr.getCell(2).numFmt = fmtCurrency; rr.getCell(2).alignment = { horizontal: 'right' };
+      rr.getCell(3).value = Math.round(q.expenses * 100) / 100; rr.getCell(3).numFmt = fmtCurrency; rr.getCell(3).alignment = { horizontal: 'right' };
+      rr.getCell(4).value = net; rr.getCell(4).numFmt = fmtCurrency; rr.getCell(4).alignment = { horizontal: 'right' };
+      if (net < 0) rr.getCell(4).font = { color: { argb: palette.accentRed }, name: 'Calibri' };
+      if (idx > 0 && Math.abs(prevNet) > 0.01) {
+        const pctChange = (net - prevNet) / Math.abs(prevNet);
+        rr.getCell(5).value = pctChange; rr.getCell(5).numFmt = '0.0%'; rr.getCell(5).alignment = { horizontal: 'right' };
+        rr.getCell(5).font = { color: { argb: pctChange >= 0 ? palette.accentGreen : palette.accentRed }, name: 'Calibri' };
+      } else if (idx > 0) {
+        rr.getCell(5).value = 'N/A'; rr.getCell(5).alignment = { horizontal: 'right' };
+      }
+      applyZebra(rr, idx % 2 === 1, palette.lightBg);
+      prevNet = net;
+      qRow++;
+    });
+
+    // Quarterly totals row
+    const qTotalRevenue = sortedQuarters.reduce((s, q) => s + (quarterlyData.get(q)?.revenue || 0), 0);
+    const qTotalExpenses = sortedQuarters.reduce((s, q) => s + (quarterlyData.get(q)?.expenses || 0), 0);
+    const qTotalNet = Math.round((qTotalRevenue - qTotalExpenses) * 100) / 100;
+    const qtr = qs.getRow(qRow);
+    qtr.getCell(1).value = 'YEAR TOTAL'; qtr.getCell(1).font = { bold: true, name: 'Calibri' };
+    qtr.getCell(2).value = Math.round(qTotalRevenue * 100) / 100; qtr.getCell(2).numFmt = fmtCurrency; qtr.getCell(2).alignment = { horizontal: 'right' }; qtr.getCell(2).font = { bold: true };
+    qtr.getCell(3).value = Math.round(qTotalExpenses * 100) / 100; qtr.getCell(3).numFmt = fmtCurrency; qtr.getCell(3).alignment = { horizontal: 'right' }; qtr.getCell(3).font = { bold: true };
+    qtr.getCell(4).value = qTotalNet; qtr.getCell(4).numFmt = fmtCurrency; qtr.getCell(4).alignment = { horizontal: 'right' }; qtr.getCell(4).font = { bold: true, color: { argb: qTotalNet >= 0 ? palette.accentGreen : palette.accentRed } };
+    for (let c = 1; c <= 5; c++) qtr.getCell(c).border = { top: { style: 'medium', color: { argb: palette.brand } }, bottom: { style: 'double', color: { argb: palette.brand } } };
+  }
+
+  // ================================================================
+  // Sheet 3: Profit & Loss
   // ================================================================
   const pl = wb.addWorksheet('Profit & Loss');
   setupSheet(pl, [{ header: 'Account', key: 'a', width: 48 }, { header: 'Amount', key: 'b', width: 22 }], palette.revenue);
-  let row = 2;
+  addPeriodSubtitle(pl, startDate, endDate);
+  addPrintSetup(pl);
+  let row = 3;
   for (const section of plSections) row = writeSection(pl, section, row);
   const nr = pl.getRow(row);
   nr.getCell(1).value = 'Net Income';
@@ -233,21 +417,35 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   nr.getCell(2).border = { top: { style: 'medium', color: { argb: palette.brand } } };
 
   // ================================================================
-  // Sheet 2: Balance Sheet
+  // Sheet 4: Balance Sheet (with color scale, EX-6)
   // ================================================================
   const bs = wb.addWorksheet('Balance Sheet');
   setupSheet(bs, [{ header: 'Account', key: 'a', width: 48 }, { header: 'Amount', key: 'b', width: 22 }], palette.asset);
-  row = 2;
+  addPeriodSubtitle(bs, startDate, endDate);
+  addPrintSetup(bs);
+  row = 3;
+  let bsFirstDataRow = row;
   for (const section of bsSections) row = writeSection(bs, section, row);
+  const bsLastDataRow = row - 2;
+  // Color scale on Amount column
+  if (bsLastDataRow >= bsFirstDataRow) {
+    bs.addConditionalFormatting({
+      ref: `B${bsFirstDataRow}:B${bsLastDataRow}`,
+      rules: [{
+        type: 'colorScale', priority: 1,
+        cfvo: [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }],
+        color: [{ argb: palette.accentRed }, { argb: 'FFFFFFFF' }, { argb: palette.accentGreen }],
+      } as any],
+    });
+  }
   const bc = bs.getRow(row);
   bc.getCell(1).value = 'Assets = Liabilities + Equity';
   bc.getCell(1).font = { italic: true, color: { argb: palette.muted }, size: 10 };
-  const balOk = Math.abs(totalAssets - totalLiabilities - totalEquity) < 0.01;
   bc.getCell(2).value = balOk ? '✓ Balanced' : '⚠ Out of balance';
   bc.getCell(2).font = { bold: true, color: { argb: balOk ? palette.accentGreen : palette.accentRed } };
 
   // ================================================================
-  // Sheet 3: Trial Balance
+  // Sheet 5: Trial Balance (with color scale, EX-6)
   // ================================================================
   const tb = wb.addWorksheet('Trial Balance');
   setupSheet(tb, [
@@ -255,7 +453,9 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     { header: 'Type', key: 't', width: 14 }, { header: 'Debits', key: 'd', width: 20 },
     { header: 'Credits', key: 'cr', width: 20 }, { header: 'Balance', key: 'b', width: 20 },
   ], palette.brand);
-  row = 2;
+  addPeriodSubtitle(tb, startDate, endDate);
+  addPrintSetup(tb);
+  row = 3;
   let totDb = 0, totCr = 0;
   const tbRows: any[] = [];
   for (const [code, totals] of accountTotals) {
@@ -268,6 +468,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     totCr += totals.credits;
   }
   tbRows.sort((a, b) => a.code.localeCompare(b.code));
+  const tbFirstDataRow = row;
   tbRows.forEach((r, idx) => {
     const rr = tb.getRow(row);
     rr.getCell(1).value = r.code; rr.getCell(1).font = { name: 'Consolas', size: 10 };
@@ -280,6 +481,18 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     applyZebra(rr, idx % 2 === 1, palette.lightBg);
     row++;
   });
+  const tbLastDataRow = row - 1;
+  // Color scale on Balance column
+  if (tbLastDataRow >= tbFirstDataRow) {
+    tb.addConditionalFormatting({
+      ref: `F${tbFirstDataRow}:F${tbLastDataRow}`,
+      rules: [{
+        type: 'colorScale', priority: 2,
+        cfvo: [{ type: 'min' }, { type: 'percentile', value: 50 }, { type: 'max' }],
+        color: [{ argb: palette.accentRed }, { argb: 'FFFFFFFF' }, { argb: palette.accentGreen }],
+      } as any],
+    });
+  }
   const ttr = tb.getRow(row);
   ttr.getCell(1).value = 'TOTAL'; ttr.getCell(1).font = { bold: true };
   ttr.getCell(4).value = Math.round(totDb * 100) / 100; ttr.getCell(4).numFmt = fmtCurrency; ttr.getCell(4).alignment = { horizontal: 'right' }; ttr.getCell(4).font = { bold: true };
@@ -287,25 +500,25 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   for (let c = 1; c <= 6; c++) ttr.getCell(c).border = { top: { style: 'medium', color: { argb: palette.brand } }, bottom: { style: 'double', color: { argb: palette.brand } } };
 
   // ================================================================
-  // Sheet 4: Transaction Detail
+  // Sheet 6: Transaction Detail (auto-filter EX-7)
   // ================================================================
+  const tdColHeaders = ['Date', 'Entry ID', 'Description', 'Account Code', 'Account Name', 'Debit', 'Credit'];
+  for (const cf of customFieldDefs) tdColHeaders.push(cf.label);
   const td = wb.addWorksheet('Transaction Detail');
   setupSheet(td, [
     { header: 'Date', key: 'dt', width: 14 }, { header: 'Entry ID', key: 'eid', width: 30 },
     { header: 'Description', key: 'desc', width: 42 }, { header: 'Account Code', key: 'ac', width: 14 },
     { header: 'Account Name', key: 'an', width: 32 }, { header: 'Debit', key: 'db', width: 18 },
     { header: 'Credit', key: 'cr', width: 18 },
+    ...customFieldDefs.map(cf => ({ header: cf.label, key: `cf_${cf.id}`, width: 20 })),
   ], palette.muted);
-  row = 2;
-  const linesByEntryId = new Map<string, any[]>();
-  for (const line of allLines) {
-    const existing = linesByEntryId.get(line.journalEntryId) || [];
-    existing.push(line);
-    linesByEntryId.set(line.journalEntryId, existing);
-  }
+  addPeriodSubtitle(td, startDate, endDate);
+  addPrintSetup(td);
+  row = 3;
   for (const entry of entriesData) {
     const eid = (entry as any)._id.toString();
     const lines = linesByEntryId.get(eid) || [];
+    const cfVals = (entry as any).customFieldValues || {};
     lines.forEach((line: any, idx: number) => {
       const rr = td.getRow(row);
       rr.getCell(1).value = entry.date || ''; rr.getCell(1).numFmt = fmtDate;
@@ -315,17 +528,27 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
       rr.getCell(5).value = accountNameMap.get(line.accountCode) || line.accountCode || '';
       rr.getCell(6).value = line.debit || 0; rr.getCell(6).numFmt = fmtCurrency; rr.getCell(6).alignment = { horizontal: 'right' };
       rr.getCell(7).value = line.credit || 0; rr.getCell(7).numFmt = fmtCurrency; rr.getCell(7).alignment = { horizontal: 'right' };
+      if (idx === 0) {
+        for (const cf of customFieldDefs) {
+          const val = cfVals[cf.id];
+          if (val !== undefined && val !== null && val !== '') rr.getCell(`cf_${cf.id}`).value = String(val);
+        }
+      }
       applyZebra(rr, idx % 2 === 1, palette.lightBg);
       row++;
     });
   }
+  const tdLastDataRow = row - 1;
+  if (tdLastDataRow >= 3) td.autoFilter = { from: { row: 2, column: 1 }, to: { row: tdLastDataRow, column: tdColHeaders.length } };
 
   // ================================================================
-  // Sheet 5: Cash Flow (unified via generateCashFlowReport)
+  // Sheet 7: Cash Flow
   // ================================================================
-  const cfReport = await generateCashFlowReport(uid, startDate || null, endDate || null);
+  const cfReport = await generateCashFlowReport(uid, startDate || null, endDate || null, baseCurrency);
   const cf = wb.addWorksheet('Cash Flow');
   setupSheet(cf, [{ header: 'Section / Account', key: 'a', width: 48 }, { header: 'Amount', key: 'b', width: 22 }], palette.accentGreen);
+  addPeriodSubtitle(cf, startDate, endDate);
+  addPrintSetup(cf);
 
   const renderCF = (title: string, items: { accountCode: string; accountName: string; amount: number }[], total: number) => {
     const sr = cf.getRow(row); sr.getCell(1).value = title; sr.getCell(1).style = sectionStyle(palette.lightBg); sr.getCell(2).style = sectionStyle(palette.lightBg); row++;
@@ -341,7 +564,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     row += 2;
   };
 
-  row = 2;
+  row = 3;
   for (const section of cfReport.sections) {
     renderCF(section.title, section.items, section.total);
   }
@@ -354,7 +577,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   cfnr.getCell(2).alignment = { horizontal: 'right' };
 
   // ================================================================
-  // Sheet 6: General Journal
+  // Sheet 8: General Journal (auto-filter EX-7)
   // ================================================================
   const gj = wb.addWorksheet('General Journal');
   setupSheet(gj, [
@@ -362,16 +585,13 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     { header: 'Ref', key: 'ref', width: 12 }, { header: 'Debit', key: 'db', width: 20 },
     { header: 'Credit', key: 'cr', width: 20 },
   ], palette.brandLight);
-  row = 2;
-  const gjLinesById = new Map<string, any[]>();
-  for (const line of allLines) {
-    const existing = gjLinesById.get(line.journalEntryId) || [];
-    existing.push(line);
-    gjLinesById.set(line.journalEntryId, existing);
-  }
+  addPeriodSubtitle(gj, startDate, endDate);
+  addPrintSetup(gj);
+  row = 3;
+  const gjFirstDataRow = row;
   for (const entry of entriesData) {
     const eid = (entry as any)._id.toString();
-    const lines = gjLinesById.get(eid) || [];
+    const lines = linesByEntryId.get(eid) || [];
     lines.forEach((line: any) => {
       const rr = gj.getRow(row);
       rr.getCell(1).value = entry.date || ''; rr.getCell(1).numFmt = fmtDate;
@@ -388,52 +608,11 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
     row++;
     row++;
   }
+  const gjLastDataRow = row - 1;
+  if (gjLastDataRow >= gjFirstDataRow) gj.autoFilter = { from: { row: 2, column: 1 }, to: { row: gjLastDataRow, column: 5 } };
 
   // ================================================================
-  // Sheet 7: Final Summary (with embedded SVG)
-  // ================================================================
-  const sm = wb.addWorksheet('Final Summary');
-  const summaryColumns = [{ header: 'Metric', key: 'm', width: 28 }, { header: 'Value', key: 'v', width: 24 }];
-  sm.columns = summaryColumns;
-  sm.views = [{ state: 'frozen', ySplit: 1 }];
-  sm.properties.tabColor = { argb: palette.brand };
-
-  sm.getRow(1).getCell(1).value = 'Final Summary';
-  sm.getRow(1).getCell(1).style = { font: { bold: true, color: { argb: palette.white }, size: 14 }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.brandDark } } };
-  sm.getRow(1).getCell(2).style = { font: { bold: true, color: { argb: palette.white }, size: 14 }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.brandDark } } };
-  sm.mergeCells('A1:B1');
-  sm.getRow(1).height = 36;
-
-  const kpiData = [
-    { label: 'Total Revenue', value: revenueTotal, color: palette.accentGreen, bg: palette.revenueBg },
-    { label: 'Total Expenses', value: expenseTotal, color: palette.accentRed, bg: palette.expenseBg },
-    { label: 'Net Income', value: netIncome, color: netIncome >= 0 ? palette.accentGreen : palette.accentRed, bg: netIncome >= 0 ? palette.revenueBg : palette.expenseBg },
-    { label: 'Profit Margin', value: revenueTotal > 0 ? `${((netIncome / revenueTotal) * 100).toFixed(1)}%` : '0.0%', color: palette.brand, bg: palette.brandLight },
-    { label: '', value: '', color: '', bg: '' },
-    { label: 'Total Assets', value: totalAssets, color: palette.asset, bg: palette.assetBg },
-    { label: 'Total Liabilities', value: totalLiabilities, color: palette.liability, bg: palette.liabilityBg },
-    { label: 'Total Equity', value: totalEquity, color: palette.equity, bg: palette.equityBg },
-    { label: 'Balance Check', value: balOk ? '✓ Balanced' : '⚠ Out of balance', color: balOk ? palette.accentGreen : palette.accentRed, bg: balOk ? palette.revenueBg : palette.expenseBg },
-  ];
-
-  row = 3;
-  for (const k of kpiData) {
-    if (!k.label) { row++; continue; }
-    const rr = sm.getRow(row);
-    rr.getCell(1).value = k.label;
-    rr.getCell(1).font = { bold: true, size: 12, color: { argb: palette.dark }, name: 'Calibri' };
-    rr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: k.bg } };
-    rr.getCell(2).value = typeof k.value === 'number' ? k.value : k.value;
-    if (typeof k.value === 'number') rr.getCell(2).numFmt = fmtCurrency;
-    rr.getCell(2).font = { bold: true, size: 14, color: { argb: k.color }, name: 'Calibri' };
-    rr.getCell(2).alignment = { horizontal: 'right' };
-    rr.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: k.bg } };
-    rr.height = 28;
-    row++;
-  }
-
-  // ================================================================
-  // Sheet 8: Import Data (keyword-based classification)
+  // Sheet 9: Import Data (existing, no subtitle to avoid conflict)
   // ================================================================
   const im = wb.addWorksheet('Import Data');
   const imCols = [
@@ -446,6 +625,7 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   im.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
   im.views = [{ state: 'frozen', ySplit: 1 }];
   im.properties.tabColor = { argb: palette.accentGreen };
+  addPrintSetup(im);
 
   im.getRow(2).values = ['Paste your CSV data starting from row 4: Date, Description, Amount. The rest auto-classifies.', '', '', '', '', '', ''];
   im.getRow(2).font = { italic: true, color: { argb: palette.muted }, size: 10 };
@@ -485,7 +665,6 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   const dataHeaderRow = row;
   const dataStart = row + 1;
 
-  // Write formulas first, THEN add the table (order matters for ExcelJS XML generation)
   for (let r = 0; r < 50; r++) {
     const rn = dataStart + r;
     const dr = im.getRow(rn);
@@ -506,35 +685,50 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   im.autoFilter = { from: { row: dataHeaderRow, column: 1 }, to: { row: dataStart + 49, column: 7 } };
 
   // ================================================================
-  // Sheet 9: Visual Analysis (in-cell data bars)
+  // Sheet 10: Visual Analysis (with MoM% change, EX-5)
   // ================================================================
   const va = wb.addWorksheet('Visual Analysis');
   va.columns = [
     { header: 'Month', key: 'm', width: 14 }, { header: 'Revenue', key: 'r', width: 20 },
     { header: 'Expenses', key: 'e', width: 20 }, { header: 'Net Income', key: 'n', width: 20 },
+    { header: '% Change', key: 'pct', width: 14 },
     { header: '', key: 'sp', width: 3 },
     { header: 'Top Expenses', key: 'ec', width: 24 }, { header: 'Amount', key: 'ea', width: 20 },
-    { header: '% of Total', key: 'pct', width: 16 },
+    { header: '% of Total', key: 'pct2', width: 16 },
   ];
   va.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
-  va.views = [{ state: 'frozen', ySplit: 1 }];
+  va.views = [{ state: 'frozen', ySplit: 2 }];
   va.properties.tabColor = { argb: palette.brand };
+  addPeriodSubtitle(va, startDate, endDate);
+  addPrintSetup(va);
 
-  // Monthly trend with data bars
+  // Monthly trend with MoM% change
   const sortedMonths = Array.from(monthlyTotals.keys()).sort();
-  let vaRow = 2;
+  let vaRow = 3;
+  let prevMonthNet = 0;
   if (sortedMonths.length >= 2) {
     for (const month of sortedMonths) {
       const mt = monthlyTotals.get(month)!;
+      const net = Math.round((mt.revenue - mt.expenses) * 100) / 100;
       const rr = va.getRow(vaRow);
       rr.getCell(1).value = month;
       rr.getCell(2).value = Math.round(mt.revenue * 100) / 100;
       rr.getCell(2).numFmt = fmtCurrency;
       rr.getCell(3).value = Math.round(mt.expenses * 100) / 100;
       rr.getCell(3).numFmt = fmtCurrency;
-      rr.getCell(4).value = Math.round((mt.revenue - mt.expenses) * 100) / 100;
+      rr.getCell(4).value = net;
       rr.getCell(4).numFmt = fmtCurrency;
+      // MoM% change (EX-5)
+      const moIdx = sortedMonths.indexOf(month);
+      if (moIdx > 0 && Math.abs(prevMonthNet) > 0.01) {
+        const pctChange = (net - prevMonthNet) / Math.abs(prevMonthNet);
+        rr.getCell(5).value = pctChange; rr.getCell(5).numFmt = '0.0%'; rr.getCell(5).alignment = { horizontal: 'right' };
+        rr.getCell(5).font = { color: { argb: pctChange >= 0 ? palette.accentGreen : palette.accentRed }, name: 'Calibri' };
+      } else if (moIdx > 0) {
+        rr.getCell(5).value = 'N/A'; rr.getCell(5).alignment = { horizontal: 'right' };
+      }
       if (vaRow % 2 === 0) applyZebra(rr, true, palette.lightBg);
+      prevMonthNet = net;
       vaRow++;
     }
   } else {
@@ -548,18 +742,18 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   }
 
   // Data bars on Revenue and Expenses columns
-  if (vaRow > 2) {
+  if (vaRow > 3) {
     const revEnd = vaRow - 1;
     const dataBarRule = (color: string) => ({ type: 'dataBar', priority: 1, cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: color }, showValue: true } as any);
-    va.addConditionalFormatting({ ref: `B2:B${revEnd}`, rules: [dataBarRule(palette.revenue)] });
-    va.addConditionalFormatting({ ref: `C2:C${revEnd}`, rules: [dataBarRule(palette.expense)] });
-    va.addConditionalFormatting({ ref: `D2:D${revEnd}`, rules: [dataBarRule(palette.accentGreen)] });
+    va.addConditionalFormatting({ ref: `B3:B${revEnd}`, rules: [dataBarRule(palette.revenue)] });
+    va.addConditionalFormatting({ ref: `C3:C${revEnd}`, rules: [dataBarRule(palette.expense)] });
+    va.addConditionalFormatting({ ref: `D3:D${revEnd}`, rules: [dataBarRule(palette.accentGreen)] });
   }
 
   // Top expenses breakdown
   vaRow += 2;
-  va.getRow(vaRow).values = ['', '', '', '', '', 'Top Expenses', 'Amount', '% of Total'];
-  for (let c = 6; c <= 8; c++) {
+  va.getRow(vaRow).values = ['', '', '', '', '', '', 'Top Expenses', 'Amount', '% of Total'];
+  for (let c = 7; c <= 9; c++) {
     va.getRow(vaRow).getCell(c).font = { bold: true, color: { argb: palette.white } };
     va.getRow(vaRow).getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.expense } };
   }
@@ -570,13 +764,13 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
 
   topExpenses.forEach((acc, idx) => {
     const rr = va.getRow(vaRow);
-    rr.getCell(6).value = acc.name;
-    rr.getCell(7).value = Math.abs(acc.balance);
-    rr.getCell(7).numFmt = fmtCurrency;
+    rr.getCell(7).value = acc.name;
+    rr.getCell(8).value = Math.abs(acc.balance);
+    rr.getCell(8).numFmt = fmtCurrency;
     const pct = expenseTotal > 0 ? (Math.abs(acc.balance) / expenseTotal) : 0;
-    rr.getCell(8).value = pct;
-    rr.getCell(8).numFmt = '0.0%';
-    if (idx % 2 === 1) { for (let c = 6; c <= 8; c++) rr.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.expenseBg } }; }
+    rr.getCell(9).value = pct;
+    rr.getCell(9).numFmt = '0.0%';
+    if (idx % 2 === 1) { for (let c = 7; c <= 9; c++) rr.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: palette.expenseBg } }; }
     vaRow++;
   });
 
@@ -585,22 +779,24 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   const expStart = vaRow - topExpenses.length;
   if (topExpenses.length > 0) {
     va.addConditionalFormatting({
-      ref: `G${expStart}:G${expEnd}`,
+      ref: `H${expStart}:H${expEnd}`,
       rules: [{ type: 'dataBar', priority: 2, cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: palette.accentRed }, showValue: true } as any],
     });
   }
 
   // ================================================================
-  // Sheet 10: Revenue Analysis
+  // Sheet 11: Revenue Analysis
   // ================================================================
   const ra = wb.addWorksheet('Revenue Analysis');
   setupSheet(ra, [
     { header: 'Account Code', key: 'ac', width: 14 }, { header: 'Account Name', key: 'an', width: 36 },
     { header: 'Amount', key: 'amt', width: 20 }, { header: '% of Total Revenue', key: 'pct', width: 20 },
   ], palette.revenue);
+  addPeriodSubtitle(ra, startDate, endDate);
+  addPrintSetup(ra);
 
   const revAccounts = plSections.find(s => s.type === 'revenue')?.accounts || [];
-  row = 2;
+  row = 3;
   revAccounts.forEach((acc, idx) => {
     const rr = ra.getRow(row);
     rr.getCell(1).value = acc.code; rr.getCell(1).font = { name: 'Consolas', size: 10 };
@@ -620,16 +816,19 @@ export async function generateWorkbook(uid: string, startDate?: string | null, e
   for (let c = 1; c <= 4; c++) rtr.getCell(c).border = { top: { style: 'medium', color: { argb: palette.revenue } }, bottom: { style: 'double', color: { argb: palette.revenue } } };
 
   // ================================================================
-  // Sheet 11: Expense Analysis
+  // ================================================================
+  // Sheet 12: Expense Analysis
   // ================================================================
   const ea = wb.addWorksheet('Expense Analysis');
   setupSheet(ea, [
     { header: 'Account Code', key: 'ac', width: 14 }, { header: 'Account Name', key: 'an', width: 36 },
     { header: 'Amount', key: 'amt', width: 20 }, { header: '% of Total Expenses', key: 'pct', width: 22 },
   ], palette.expense);
+  addPeriodSubtitle(ea, startDate, endDate);
+  addPrintSetup(ea);
 
   const expAccounts = plSections.find(s => s.type === 'expense')?.accounts || [];
-  row = 2;
+  row = 3;
   expAccounts.forEach((acc, idx) => {
     const rr = ea.getRow(row);
     rr.getCell(1).value = acc.code; rr.getCell(1).font = { name: 'Consolas', size: 10 };

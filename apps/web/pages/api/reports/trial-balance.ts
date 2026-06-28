@@ -4,8 +4,10 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 import { checkFeatureAccess } from '@/lib/subscription';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { convertJournalLines } from '@/lib/currency';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -20,6 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await dbConnect();
 
   try {
+    const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
     const { startDate, endDate } = req.query;
     const query: Record<string, any> = { userId: uid };
     if (startDate) query.date = { $gte: startDate as string };
@@ -28,7 +33,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const entries = await JournalEntry.find(query).select('_id').lean();
     const entryIds = entries.map(e => (e as any)._id.toString());
 
-    const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+    const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
+    const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
+    const currencyMap = new Map<string, { currency?: string }>();
+    for (const a of accountDocs) {
+      accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
+      currencyMap.set(a.code, { currency: (a as any).currency || 'USD' });
+    }
+
+    const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+    const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
     const accountTotals = new Map<string, { debits: number; credits: number }>();
     for (const line of lines) {
       const code = line.accountCode;
@@ -38,10 +52,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totals.credits += line.credit || 0;
       accountTotals.set(code, totals);
     }
-
-    const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
-    const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
-    for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
 
     const rows: any[] = [];
     let totalDebits = 0, totalCredits = 0;
@@ -66,6 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           difference: Math.round(Math.abs(totalDebits - totalCredits) * 100) / 100,
           balanced: Math.abs(totalDebits - totalCredits) < 0.01,
         },
+        baseCurrency,
       },
     });
   } catch (e: any) {

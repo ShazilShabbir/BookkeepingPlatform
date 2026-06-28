@@ -2,6 +2,8 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import ExchangeRate from '@/lib/models/ExchangeRate';
+import { convertJournalLines } from '@/lib/currency';
 
 export interface BrandingOptions {
   logo?: string;
@@ -35,6 +37,7 @@ export interface FinancialStatements {
     totalEquity: number;
   };
   dateRange: { start: string | null; end: string | null };
+  baseCurrency: string;
 }
 
 export interface CashFlowItem {
@@ -62,6 +65,7 @@ export async function getFinancialStatements(
   userId: string,
   startDate?: string | null,
   endDate?: string | null,
+  baseCurrency: string = 'USD',
 ): Promise<FinancialStatements> {
   if (startDate && endDate && startDate > endDate) {
     throw new Error('Start date must be before end date');
@@ -70,10 +74,28 @@ export async function getFinancialStatements(
   await dbConnect();
 
   const accountDocs = await Account.find({ userId, isActive: true }).lean();
-  const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
+  const accountMap = new Map<string, { name: string; type: string; normalBalance: string; currency: string }>();
   for (const a of accountDocs) {
-    accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || defaultNormalBalance(a.type) });
+    accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || defaultNormalBalance(a.type), currency: (a as any).currency || 'USD' });
   }
+
+  const exchangeRateDocs = await ExchangeRate.find({ userId }).sort({ date: -1 }).lean();
+  const rateMap = new Map<string, number>();
+  for (const r of exchangeRateDocs) {
+    const key = `${(r as any).baseCurrency}:${(r as any).targetCurrency}`;
+    if (!rateMap.has(key)) rateMap.set(key, (r as any).rate);
+  }
+
+  const convertToBase = (amount: number, fromCurrency: string): number => {
+    if (fromCurrency === baseCurrency || !fromCurrency) return amount;
+    const key = `${fromCurrency}:${baseCurrency}`;
+    const rate = rateMap.get(key);
+    if (rate) return Math.round(amount * rate * 100) / 100;
+    const inverseKey = `${baseCurrency}:${fromCurrency}`;
+    const inverseRate = rateMap.get(inverseKey);
+    if (inverseRate && inverseRate > 0) return Math.round(amount / inverseRate * 100) / 100;
+    return amount;
+  };
 
   const bsTypes = new Set(['asset', 'liability', 'equity']);
   const plTypes = new Set(['revenue', 'expense']);
@@ -93,8 +115,8 @@ export async function getFinancialStatements(
     const info = accountMap.get(code)!;
     if (!plTypes.has(info.type)) continue;
     const totals = plTotals.get(code) || { debits: 0, credits: 0 };
-    totals.debits += line.debit || 0;
-    totals.credits += line.credit || 0;
+    totals.debits += convertToBase(line.debit || 0, info.currency);
+    totals.credits += convertToBase(line.credit || 0, info.currency);
     plTotals.set(code, totals);
   }
 
@@ -112,8 +134,8 @@ export async function getFinancialStatements(
     const info = accountMap.get(code)!;
     if (!bsTypes.has(info.type)) continue;
     const totals = bsTotals.get(code) || { debits: 0, credits: 0 };
-    totals.debits += line.debit || 0;
-    totals.credits += line.credit || 0;
+    totals.debits += convertToBase(line.debit || 0, info.currency);
+    totals.credits += convertToBase(line.credit || 0, info.currency);
     bsTotals.set(code, totals);
   }
 
@@ -187,6 +209,7 @@ export async function getFinancialStatements(
       totalEquity,
     },
     dateRange: { start: startDate || null, end: endDate || null },
+    baseCurrency,
   };
 }
 
@@ -194,6 +217,7 @@ export async function generateCashFlowReport(
   userId: string,
   startDate?: string | null,
   endDate?: string | null,
+  baseCurrency: string = 'USD',
 ): Promise<CashFlowReport> {
   await dbConnect();
 
@@ -204,10 +228,16 @@ export async function generateCashFlowReport(
   const entries = await JournalEntry.find(query).select('_id').lean();
   const entryIds = entries.map(e => (e as any)._id.toString());
 
-  const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId }).lean();
+  const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId }).lean();
   const accountDocs = await Account.find({ userId, isActive: true }).lean();
   const accountMap = new Map<string, { name: string; type: string }>();
-  for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type });
+  const currencyMap = new Map<string, { currency?: string }>();
+  for (const a of accountDocs) {
+    accountMap.set(a.code, { name: a.name, type: a.type });
+    currencyMap.set(a.code, { currency: (a as any).currency || 'USD' });
+  }
+
+  const lines = await convertJournalLines(userId, rawLines, currencyMap, baseCurrency);
 
   const linesByEntry = new Map<string, any[]>();
   for (const line of lines) {
@@ -253,15 +283,15 @@ export function generateReportHTML(
   shareLink?: string,
   branding?: BrandingOptions,
 ): string {
-  const { profitLoss, balanceSheet, dateRange } = statements;
+  const { profitLoss, balanceSheet, dateRange, baseCurrency } = statements;
   const netIncome = profitLoss.netIncome;
-  const netIncomeStr = netIncome.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const netIncomeStr = netIncome.toLocaleString('en-US', { style: 'currency', currency: baseCurrency });
   const marginStr = profitLoss.netIncomeRatio.toFixed(1);
 
   const revenueTotal = profitLoss.sections.find(s => s.type === 'revenue')?.total || 0;
   const expenseTotal = profitLoss.sections.find(s => s.type === 'expense')?.total || 0;
-  const revenueStr = revenueTotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-  const expenseStr = expenseTotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const revenueStr = revenueTotal.toLocaleString('en-US', { style: 'currency', currency: baseCurrency });
+  const expenseStr = expenseTotal.toLocaleString('en-US', { style: 'currency', currency: baseCurrency });
 
   const plRows = (type: string) => {
     const section = profitLoss.sections.find(s => s.type === type);
@@ -273,7 +303,7 @@ export function generateReportHTML(
           ${a.accountName}
         </td>
         <td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:13px;font-family:monospace">
-          ${a.balance >= 0 ? a.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : `(${Math.abs(a.balance).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})`}
+          ${a.balance >= 0 ? a.balance.toLocaleString('en-US', { style: 'currency', currency: baseCurrency }) : `(${Math.abs(a.balance).toLocaleString('en-US', { style: 'currency', currency: baseCurrency })})`}
         </td>
       </tr>`).join('');
   };
@@ -288,7 +318,7 @@ export function generateReportHTML(
           ${a.accountName}
         </td>
         <td style="padding:6px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:13px;font-family:monospace">
-          ${a.balance >= 0 ? a.balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : `(${Math.abs(a.balance).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})`}
+          ${a.balance >= 0 ? a.balance.toLocaleString('en-US', { style: 'currency', currency: baseCurrency }) : `(${Math.abs(a.balance).toLocaleString('en-US', { style: 'currency', currency: baseCurrency })})`}
         </td>
       </tr>`).join('');
   };
@@ -299,7 +329,7 @@ export function generateReportHTML(
     ? `${dateRange.start} – ${dateRange.end}`
     : 'All Time';
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: baseCurrency });
 
   const pc = branding?.primaryColor || '#6366f1';
   const pcLighter = pc + '33';

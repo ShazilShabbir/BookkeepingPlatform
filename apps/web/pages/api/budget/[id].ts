@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!budget) return res.status(404).json({ error: 'Budget not found' });
 
-      return res.status(200).json({ success: true, data: { _id: (budget as any)._id.toString(), accountCode: budget.accountCode, month: budget.month, amount: budget.amount } });
+      return res.status(200).json({ success: true, data: { _id: (budget as any)._id.toString(), accountCode: budget.accountCode, month: budget.month, amount: budget.amount, currency: budget.currency || 'USD' } });
     }
 
     if (req.method === 'DELETE') {

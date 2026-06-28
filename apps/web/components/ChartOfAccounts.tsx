@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Input, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
-import { getCurrencySymbol, COMMON_CURRENCIES } from '@/lib/format';
+import { COMMON_CURRENCIES } from '@/lib/format';
 import clsx from 'clsx';
+import Papa from 'papaparse';
 
 type Account = {
   _id: string;
@@ -147,18 +148,17 @@ export default function ChartOfAccounts({ userId }: { userId: string }) {
     setImporting(true);
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
-      const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      const rows = parsed.data as Record<string, string>[];
+      const header = Object.keys(rows[0] || {}).map(h => h.trim().toLowerCase());
       if (!header.includes('code') || !header.includes('name') || !header.includes('type')) {
         toast.error('CSV must have columns: code, name, type');
         return;
       }
       const results = { created: 0, skipped: 0, errors: 0 };
       let lastError = '';
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
-        const row = Object.fromEntries(header.map((h, idx) => [h, cols[idx] || '']));
+      for (let i = 0; i < rows.length; i++) {
+        const row = Object.fromEntries(header.map(h => [h, (rows[i]?.[h] || '').trim()]));
         try {
           const body: Record<string, any> = { code: row.code, name: row.name, type: row.type, normalBalance: row.normalbalance || 'debit', currency: row.currency || 'USD' };
           if (row.parentcode) body.parentCode = row.parentcode;

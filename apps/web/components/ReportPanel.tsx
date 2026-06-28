@@ -19,11 +19,10 @@ interface DashboardData {
   cashFlow: { sections: CashFlowSection[]; totalChange: number } | null;
   trialBalance: { rows: TrialBalanceRow[]; totals: { totalDebits: number; totalCredits: number; difference: number; balanced: boolean } } | null;
   dateRange: { startDate: string | null; endDate: string | null };
+  baseCurrency: string;
 }
 
 type ReportView = 'pl' | 'bs' | 'cf' | 'tb' | 'all';
-
-const fmt = (n: number, currency = 'USD') => formatCurrency(n, currency);
 
 const tabs: { id: ReportView; label: string }[] = [
   { id: 'all', label: 'All Reports' },
@@ -44,6 +43,8 @@ export default function ReportPanel({ userId }: { userId: string }) {
   const [downloading, setDownloading] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const fetchedRef = useRef(false);
+
+  const fmt = (n: number) => formatCurrency(n, data?.baseCurrency || 'USD');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -294,10 +295,10 @@ export default function ReportPanel({ userId }: { userId: string }) {
                   <td className="py-2 px-3 font-mono text-surface-400">{row.accountCode}</td>
                   <td className="py-2 px-3 text-surface-900">{row.accountName}</td>
                   <td className="py-2 px-3 text-surface-500">{row.accountType}</td>
-                  <td className="py-2 px-3 text-right font-mono">{row.totalDebits.toFixed(2)}</td>
-                  <td className="py-2 px-3 text-right font-mono">{row.totalCredits.toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right font-mono">{fmt(row.totalDebits)}</td>
+                  <td className="py-2 px-3 text-right font-mono">{fmt(row.totalCredits)}</td>
                   <td className={`py-2 px-3 text-right font-mono font-medium ${row.netBalance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {row.netBalance.toFixed(2)}
+                    {fmt(row.netBalance)}
                   </td>
                 </tr>
               ))}
@@ -305,9 +306,9 @@ export default function ReportPanel({ userId }: { userId: string }) {
             <tfoot>
               <tr className="bg-surface-50 font-semibold border-t-2 border-surface-300">
                 <td colSpan={3} className="py-2 px-3 text-surface-700">TOTAL</td>
-                <td className="py-2 px-3 text-right font-mono text-surface-900">{trialBalance.totals.totalDebits.toFixed(2)}</td>
-                <td className="py-2 px-3 text-right font-mono text-surface-900">{trialBalance.totals.totalCredits.toFixed(2)}</td>
-                <td className="py-2 px-3 text-right font-mono text-surface-900">{trialBalance.totals.difference.toFixed(2)}</td>
+                <td className="py-2 px-3 text-right font-mono text-surface-900">{fmt(trialBalance.totals.totalDebits)}</td>
+                <td className="py-2 px-3 text-right font-mono text-surface-900">{fmt(trialBalance.totals.totalCredits)}</td>
+                <td className="py-2 px-3 text-right font-mono text-surface-900">{fmt(trialBalance.totals.difference)}</td>
               </tr>
             </tfoot>
           </table>

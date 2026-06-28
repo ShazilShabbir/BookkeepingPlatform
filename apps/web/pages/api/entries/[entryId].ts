@@ -30,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'PUT') {
-    const { date, description } = req.body;
+    const { date, description, customFieldValues } = req.body;
     if (!date) return res.status(400).json({ error: 'date is required' });
 
     const period = (entry as any).date?.slice(0, 7);
@@ -39,11 +39,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (closed) return res.status(403).json({ error: 'Cannot edit entries in a closed period' });
     }
 
-    await JournalEntry.findByIdAndUpdate(entryId, {
-      $set: { date, description: description || '', updatedAt: new Date() },
-    });
+    const update: Record<string, any> = { date, description: description || '', updatedAt: new Date() };
+    if (customFieldValues !== undefined) {
+      update.customFieldValues = customFieldValues;
+    }
 
-    await logAction({ userId: uid, action: 'update', resource: 'entry', resourceId: entryId, details: { date, description }, req });
+    await JournalEntry.findByIdAndUpdate(entryId, { $set: update });
+
+    await logAction({ userId: uid, action: 'update', resource: 'entry', resourceId: entryId, details: { date, description, customFieldValues }, req });
     return res.status(200).json({ success: true });
   }
 

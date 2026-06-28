@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, FormEvent } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import { Card, Button, Input } from '@/components/ui';
 import toast from 'react-hot-toast';
 import Head from 'next/head';
@@ -59,9 +60,39 @@ export default function SettingsPage() {
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [rateSaving, setRateSaving] = useState(false);
 
+  const [baseCurrency, setBaseCurrency] = useState('USD');
+  const [baseCurrencySaving, setBaseCurrencySaving] = useState(false);
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  const [dirty, setDirty] = useState(false);
+  const router = useRouter();
+
+  // Unsaved changes warning
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handleRouteChange = (url: string) => {
+      if (url === router.asPath) return;
+      if (!window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+        router.events.emit('routeChangeError');
+        throw new Error('Route change aborted');
+      }
+    };
+    router.events.on('routeChangeStart', handleRouteChange);
+    return () => router.events.off('routeChangeStart', handleRouteChange);
+  }, [dirty, router]);
+
+  const markDirty = useCallback(() => { if (!dirty) setDirty(true); }, [dirty]);
+  const clearDirty = useCallback(() => setDirty(false), []);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -71,6 +102,7 @@ export default function SettingsPage() {
         setName(session?.user?.name || '');
         setEmail(session?.user?.email || '');
         setCompanyName(json.data?.createdAt ? '' : '');
+        setBaseCurrency(json.data?.baseCurrency || 'USD');
       }
     } catch { /* use session defaults */ } finally {
       setLoading(false);
@@ -138,6 +170,7 @@ export default function SettingsPage() {
       toast.error('Something went wrong');
     } finally {
       setSaving(false);
+      clearDirty();
     }
   };
 
@@ -167,6 +200,7 @@ export default function SettingsPage() {
       toast.error('Something went wrong');
     } finally {
       setChangingPassword(false);
+      clearDirty();
     }
   };
 
@@ -227,7 +261,7 @@ export default function SettingsPage() {
     if (!file) return;
     if (file.size > 512 * 1024) { toast.error('Logo must be under 512KB'); return; }
     const reader = new FileReader();
-    reader.onload = () => setBrandingLogo(reader.result as string);
+    reader.onload = () => { setBrandingLogo(reader.result as string); markDirty(); };
     reader.readAsDataURL(file);
   };
 
@@ -251,6 +285,7 @@ export default function SettingsPage() {
       toast.error('Something went wrong');
     } finally {
       setBrandingSaving(false);
+      clearDirty();
     }
   };
 
@@ -298,6 +333,25 @@ export default function SettingsPage() {
       }
     } catch {
       toast.error('Something went wrong');
+    }
+  };
+
+  const handleSaveBaseCurrency = async () => {
+    setBaseCurrencySaving(true);
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseCurrency }),
+      });
+      const json = await res.json();
+      if (json.success) toast.success('Base currency updated');
+      else toast.error(json.error || 'Failed to update base currency');
+    } catch {
+      toast.error('Something went wrong');
+    } finally {
+      setBaseCurrencySaving(false);
+      clearDirty();
     }
   };
 
@@ -396,9 +450,9 @@ export default function SettingsPage() {
               <Card padding="lg">
                 <h2 className="text-lg font-semibold text-surface-900 mb-6">Profile</h2>
                 <form onSubmit={handleProfileSubmit} className="space-y-4">
-                  <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-                  <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                  <Input label="Company Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                  <Input label="Name" value={name} onChange={(e) => { setName(e.target.value); markDirty(); }} required />
+                  <Input label="Email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); markDirty(); }} required />
+                  <Input label="Company Name" value={companyName} onChange={(e) => { setCompanyName(e.target.value); markDirty(); }} />
                   <div className="pt-2">
                     <Button type="submit" loading={saving}>Save Changes</Button>
                   </div>
@@ -408,9 +462,9 @@ export default function SettingsPage() {
               <Card padding="lg">
                 <h2 className="text-lg font-semibold text-surface-900 mb-6">Change Password</h2>
                 <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                  <Input label="Current Password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-                  <Input label="New Password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-                  <Input label="Confirm New Password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                  <Input label="Current Password" type="password" value={currentPassword} onChange={(e) => { setCurrentPassword(e.target.value); markDirty(); }} required />
+                  <Input label="New Password" type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); markDirty(); }} required />
+                  <Input label="Confirm New Password" type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); markDirty(); }} required />
                   <div className="pt-2">
                     <Button type="submit" loading={changingPassword}>Change Password</Button>
                   </div>
@@ -528,20 +582,20 @@ export default function SettingsPage() {
                 <div className="animate-spin w-6 h-6 border-4 border-primary-600 border-t-transparent rounded-full" />
               ) : (
                 <form onSubmit={handleBrandingSubmit} className="space-y-4">
-                  <Input label="Branding Company Name" value={brandingCompanyName} onChange={(e) => setBrandingCompanyName(e.target.value)} placeholder="Your Company Name" />
+                  <Input label="Branding Company Name" value={brandingCompanyName} onChange={(e) => { setBrandingCompanyName(e.target.value); markDirty(); }} placeholder="Your Company Name" />
                   <div>
                     <label className="block text-sm font-medium text-surface-700 mb-1">Primary Color</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="color"
                         value={brandingPrimaryColor}
-                        onChange={(e) => setBrandingPrimaryColor(e.target.value)}
+                        onChange={(e) => { setBrandingPrimaryColor(e.target.value); markDirty(); }}
                         className="w-10 h-10 rounded border border-surface-300 cursor-pointer"
                       />
                       <input
                         type="text"
                         value={brandingPrimaryColor}
-                        onChange={(e) => setBrandingPrimaryColor(e.target.value)}
+                        onChange={(e) => { setBrandingPrimaryColor(e.target.value); markDirty(); }}
                         className="flex-1 rounded-lg border border-surface-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         placeholder="#6366f1"
                       />
@@ -579,6 +633,24 @@ export default function SettingsPage() {
                   <Button onClick={() => setShowAddRate(true)} size="sm">Add Currency</Button>
                 )}
               </div>
+
+              <div className="mb-6 p-4 bg-surface-50 rounded-lg border border-surface-200">
+                <h3 className="text-sm font-semibold text-surface-900 mb-2">Base Currency</h3>
+                <p className="text-xs text-surface-500 mb-3">All financial reports will be displayed in this currency. Exchange rates convert other currencies to this base.</p>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={baseCurrency}
+                    onChange={(e) => { setBaseCurrency(e.target.value); markDirty(); }}
+                    className="rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  >
+                    {COMMON_CURRENCIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.code} ({c.symbol}) — {c.name}</option>
+                    ))}
+                  </select>
+                  <Button onClick={handleSaveBaseCurrency} loading={baseCurrencySaving} size="sm">Save</Button>
+                </div>
+              </div>
+
               {!multiCurrencyAllowed ? (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <p className="text-sm text-amber-800 font-medium">Multi-currency requires Pro plan or higher.</p>
@@ -600,7 +672,7 @@ export default function SettingsPage() {
                           <div>
                             <p className="text-sm font-medium text-surface-900">{ccy ? `${ccy.name} (${target})` : target}</p>
                             <p className="text-xs text-surface-500">
-                              1 USD = {formatCurrency(data.rate, target)}
+                              1 {baseCurrency} = {formatCurrency(data.rate, target)}
                               {data.source === 'auto' && <span className="ml-2 text-emerald-600">Auto</span>}
                               <span className="ml-2">{data.date ? new Date(data.date).toLocaleDateString() : ''}</span>
                             </p>
@@ -625,13 +697,13 @@ export default function SettingsPage() {
                             onChange={(e) => setNewTargetCurrency(e.target.value)}
                             className="w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
                           >
-                            {COMMON_CURRENCIES.filter(c => c.code !== 'USD').map(c => (
+                            {COMMON_CURRENCIES.filter(c => c.code !== baseCurrency).map(c => (
                               <option key={c.code} value={c.code}>{c.code} ({c.symbol}) — {c.name}</option>
                             ))}
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <label className="text-xs font-medium text-surface-700">Rate (1 USD = ?)</label>
+                          <label className="text-xs font-medium text-surface-700">Rate (1 {baseCurrency} = ?)</label>
                           <Input type="number" step="0.0001" min="0" value={newRate} onChange={(e) => setNewRate(e.target.value)} placeholder="0.85" />
                         </div>
                         <div className="space-y-1">

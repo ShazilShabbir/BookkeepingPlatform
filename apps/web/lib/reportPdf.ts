@@ -1,3 +1,7 @@
+import { formatCurrency } from '@/lib/format';
+
+let _baseCurrency = 'USD';
+
 const COLORS = {
   primary: '#4f46e5',
   primaryLight: '#eef2ff',
@@ -13,7 +17,7 @@ const COLORS = {
 };
 
 function fmt(n: number) {
-  return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(n, _baseCurrency);
 }
 
 function tableRow(label: string, value: string, bold = false, color?: string) {
@@ -73,10 +77,12 @@ interface ReportInput {
   cashFlow?: { sections: any[]; totalChange: number } | null;
   trialBalance?: { rows: any[]; totals: { totalDebits: number; totalCredits: number; difference: number; balanced: boolean } } | null;
   dateRange: { startDate?: string | null; endDate?: string | null };
+  baseCurrency?: string;
 }
 
 export function buildReportDocDefinition(input: ReportInput, ownerName: string) {
   const { kpis, profitLoss, balanceSheet, cashFlow, trialBalance, dateRange } = input;
+  _baseCurrency = input.baseCurrency || 'USD';
   const dateLabel = dateRange.startDate && dateRange.endDate ? `${dateRange.startDate} – ${dateRange.endDate}` : 'All Time';
 
   const content: any[] = [];

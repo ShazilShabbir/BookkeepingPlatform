@@ -6,6 +6,7 @@ import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
 import { getFinancialStatements } from '@/lib/reports';
+import { convertJournalLines } from '@/lib/currency';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -31,8 +32,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const sectionTypes = new Set(report.sections?.map(s => s.type) || []);
 
+    const userDoc = await (await import('@/lib/models/User')).default.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
     if (sectionTypes.has('kpi-summary') || sectionTypes.has('profit-loss') || sectionTypes.has('balance-sheet') || sectionTypes.has('cash-flow') || sectionTypes.has('trial-balance')) {
-      const statements = await getFinancialStatements(uid, startDate, endDate);
+      const statements = await getFinancialStatements(uid, startDate, endDate, baseCurrency);
       result.profitLoss = statements.profitLoss;
       result.balanceSheet = statements.balanceSheet;
     }
@@ -44,10 +48,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const entries = await JournalEntry.find(query).select('_id date').lean();
       const entryIds = entries.map(e => (e as any)._id.toString());
-      const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
       const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
       const accountMap = new Map<string, { name: string; type: string; normalBalance: string }>();
-      for (const a of accountDocs) accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
+      const currencyMap = new Map<string, { currency?: string }>();
+      for (const a of accountDocs) {
+        accountMap.set(a.code, { name: a.name, type: a.type, normalBalance: a.normalBalance || 'debit' });
+        currencyMap.set(a.code, { currency: (a as any).currency || 'USD' });
+      }
 
       const revenueByCategory = new Map<string, { amount: number; count: number }>();
       const expensesByCategory = new Map<string, { amount: number; count: number }>();
@@ -57,6 +64,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const month = (entry as any).date?.slice(0, 7);
         if (month && !monthlyData.has(month)) monthlyData.set(month, { revenue: 0, expenses: 0 });
       }
+
+      const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+      const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
 
       for (const line of lines) {
         const info = accountMap.get(line.accountCode);
@@ -101,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       result.kpis = { totalRevenue: Math.round(rev * 100) / 100, totalExpenses: Math.round(exp * 100) / 100, netProfit: Math.round(net * 100) / 100, profitMargin: rev > 0 ? Math.round((net / rev) * 1000) / 10 : 0 };
     }
 
-    return res.status(200).json({ success: true, data: result });
+    return res.status(200).json({ success: true, data: { ...result, baseCurrency } });
   } catch (e: any) {
     console.error('generate report error:', e?.message || e);
     return res.status(500).json({ success: false, error: 'Internal server error' });

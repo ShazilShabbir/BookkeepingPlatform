@@ -12,6 +12,7 @@ import JournalLine from '@/lib/models/JournalLine';
 import User from '@/lib/models/User';
 import { buildReportDocDefinition } from '@/lib/reportPdf';
 import { generateCashFlowReport } from '@/lib/reports';
+import { convertJournalLines } from '@/lib/currency';
 
 function defaultNormalBalance(type: string): string {
   return ['revenue', 'liability', 'equity'].includes(type) ? 'credit' : 'debit';
@@ -37,11 +38,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await dbConnect();
 
     const [userDoc, accountDocs] = await Promise.all([
-      User.findById(uid).select('name email').lean(),
+      User.findById(uid).select('name email baseCurrency').lean(),
       Account.find({ userId: uid, isActive: true }).lean(),
     ]);
     const ownerName = (userDoc as any)?.name || 'User';
+    const baseCurrency = (userDoc as any)?.baseCurrency || 'USD';
     const accountMap = new Map(accountDocs.map(a => [a.code, a]));
+    const currencyMap = new Map(accountDocs.map(a => [a.code, { currency: (a as any).currency || 'USD' }]));
 
     const bsTypes = new Set(['asset', 'liability', 'equity']);
     const plTypes = new Set(['revenue', 'expense']);
@@ -51,13 +54,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (endDate) plQuery.date = { ...plQuery.date, $lte: endDate };
     const plEntries = await JournalEntry.find(plQuery).select('_id date').lean();
     const plEntryIds = plEntries.map(e => (e as any)._id.toString());
-    const plLines = await JournalLine.find({ journalEntryId: { $in: plEntryIds }, userId: uid }).lean();
+    const rawPlLines = await JournalLine.find({ journalEntryId: { $in: plEntryIds }, userId: uid }).lean();
+    const plLines = await convertJournalLines(uid, rawPlLines, currencyMap, baseCurrency);
 
     const bsQuery: Record<string, any> = { userId: uid };
     if (endDate) bsQuery.date = { $lte: endDate };
     const bsEntries = await JournalEntry.find(bsQuery).select('_id date').lean();
     const bsEntryIds = bsEntries.map(e => (e as any)._id.toString());
-    const bsLines = await JournalLine.find({ journalEntryId: { $in: bsEntryIds }, userId: uid }).lean();
+    const rawBsLines = await JournalLine.find({ journalEntryId: { $in: bsEntryIds }, userId: uid }).lean();
+    const bsLines = await convertJournalLines(uid, rawBsLines, currencyMap, baseCurrency);
 
     const plTotals = new Map<string, { debits: number; credits: number }>();
     for (const line of plLines) {
@@ -146,7 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       cashBalance,
     };
 
-    const cashFlowRes = await generateCashFlowReport(uid!, startDate || null, endDate || null);
+    const cashFlowRes = await generateCashFlowReport(uid!, startDate || null, endDate || null, baseCurrency);
 
     const trialBalanceRes = (() => {
       const rows: any[] = [];
@@ -185,6 +190,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       cashFlow: cashFlowRes,
       trialBalance: trialBalanceRes,
       dateRange: { startDate: startDate || null, endDate: endDate || null },
+      baseCurrency,
     }, ownerName);
 
     let pdfmake: any;

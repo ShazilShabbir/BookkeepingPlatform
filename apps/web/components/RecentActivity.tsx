@@ -49,7 +49,7 @@ export default function RecentActivity({ userId }: { userId: string }) {
       try {
         const res = await fetch('/api/dashboard/activity?userId=' + encodeURIComponent(userId));
         const json = await res.json();
-        if (json.success) setItems(json.data.slice(0, 8));
+        if (json.success && Array.isArray(json.data)) setItems(json.data.slice(0, 8));
       } catch {} finally { setLoading(false); }
     };
     fetchActivity();

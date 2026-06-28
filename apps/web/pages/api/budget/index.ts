@@ -3,15 +3,19 @@ import { getToken } from 'next-auth/jwt';
 import dbConnect from '@/lib/mongoose';
 import Budget from '@/lib/models/Budget';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   const uid = token.sub as string;
 
-  await dbConnect();
+    await dbConnect();
 
-  try {
+    const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
+    try {
     if (req.method === 'GET') {
       const { month, accountCode } = req.query;
       if (!month || typeof month !== 'string') return res.status(400).json({ error: 'month query param required (YYYY-MM)' });
@@ -31,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         amount: b.amount,
       }));
 
-      return res.status(200).json({ success: true, data });
+      return res.status(200).json({ success: true, data, baseCurrency });
     }
 
     if (req.method === 'POST') {
@@ -40,11 +44,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const budget = await Budget.findOneAndUpdate(
         { userId: uid, accountCode, month },
-        { userId: uid, accountCode, month, amount: Math.max(0, amount) },
+        { userId: uid, accountCode, month, amount: Math.max(0, amount), currency: baseCurrency },
         { upsert: true, new: true },
       ).lean();
 
-      return res.status(200).json({ success: true, data: { _id: (budget as any)._id.toString(), accountCode: budget.accountCode, month: budget.month, amount: budget.amount } });
+      return res.status(200).json({ success: true, data: { _id: (budget as any)._id.toString(), accountCode: budget.accountCode, month: budget.month, amount: budget.amount, currency: budget.currency || 'USD' } });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

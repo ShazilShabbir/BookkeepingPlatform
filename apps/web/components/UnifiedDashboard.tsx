@@ -38,6 +38,7 @@ interface DashboardData {
   revenueByCategory?: CategoryStat[];
   expensesByCategory?: CategoryStat[];
   topCategories?: CategoryStat[];
+  baseCurrency?: string;
 }
 
 const metricConfig: { key: string; label: string; isCurrency: boolean; suffix?: string; color: string; accent: string; icon: React.ReactNode }[] = [
@@ -52,6 +53,7 @@ const metricConfig: { key: string; label: string; isCurrency: boolean; suffix?: 
 export default function UnifiedDashboard({ userId }: { userId: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const fetchedRef = useRef(false);
@@ -89,7 +91,7 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    if (showLoading) setLoading(true);
+    if (showLoading) { setLoading(true); setError(null); }
     try {
       const params = new URLSearchParams();
       if (startDate) params.set('startDate', startDate);
@@ -101,6 +103,7 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
       setData(json.data);
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
       toast.error(err instanceof Error ? err.message : 'Failed to load dashboard');
     } finally { if (abortRef.current === controller) setLoading(false); }
   }, [startDate, endDate, userId]);
@@ -202,6 +205,23 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
   if (loading) return loadingSkeleton;
 
   if (!data) {
+    if (error) {
+      return (
+        <Card padding="lg" className="text-center py-12 sm:py-16">
+          <div className="max-w-lg mx-auto">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-100 to-red-50 flex items-center justify-center mx-auto mb-6 shadow-sm">
+              <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-surface-900 mb-2">Failed to Load Dashboard</h2>
+            <p className="text-surface-500 mb-6">{error}</p>
+            <Button size="lg" onClick={() => fetchData()}>Retry</Button>
+          </div>
+        </Card>
+      );
+    }
+
     return (
       <Card padding="lg" className="text-center py-12 sm:py-16">
         <div className="max-w-lg mx-auto">
@@ -284,7 +304,7 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
             : data.trends?.profit;
           const trendVal = trends && trends.length > 1 ? ((trends[trends.length - 1] - trends[0]) / Math.abs(trends[0] || 1)) * 100 : undefined;
           const drillType = m.key === 'totalRevenue' ? 'revenue' : m.key === 'totalExpenses' ? 'expenses' : m.key === 'netProfit' ? 'net-profit' : m.key === 'profitMargin' ? 'profit-margin' : m.key === 'cashBalance' ? 'cash-balance' : 'entries';
-          return <KpiCard key={m.key} label={m.label} value={value} suffix={m.suffix} color={m.color} accent={m.accent} icon={m.icon} trend={trendVal} trendData={trends} isCurrency={m.isCurrency} onClick={() => handleKpiClick(drillType)} index={idx} />;
+          return <KpiCard key={m.key} label={m.label} value={value} suffix={m.suffix} color={m.color} accent={m.accent} icon={m.icon} trend={trendVal} trendData={trends} isCurrency={m.isCurrency} currency={data.baseCurrency} onClick={() => handleKpiClick(drillType)} index={idx} />;
         })}
       </div>
 
@@ -316,10 +336,10 @@ export default function UnifiedDashboard({ userId }: { userId: string }) {
       {chartTab === 'category-breakdown' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {expensesByCategory && expensesByCategory.length > 0 && (
-            <CategoryChart data={expensesByCategory} onCategoryClick={handleCategoryClick} />
+            <CategoryChart data={expensesByCategory} onCategoryClick={handleCategoryClick} baseCurrency={data.baseCurrency} />
           )}
           {(revenueByCategory && revenueByCategory.length > 0) && (
-            <TopCategories revenueByCategory={revenueByCategory} expensesByCategory={expensesByCategory || []} />
+            <TopCategories revenueByCategory={revenueByCategory} expensesByCategory={expensesByCategory || []} baseCurrency={data.baseCurrency} />
           )}
         </div>
       )}

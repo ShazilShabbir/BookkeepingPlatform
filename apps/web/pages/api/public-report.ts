@@ -21,16 +21,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { startDate, endDate, type, download } = req.query;
 
     if (download === 'excel') {
-      const user = await User.findById(uid).select('brandingPrimaryColor brandingCompanyName').lean();
+      const user = await User.findById(uid).select('brandingPrimaryColor brandingCompanyName baseCurrency').lean();
       const branding = user ? { primaryColor: (user as any).brandingPrimaryColor, companyName: (user as any).brandingCompanyName } : undefined;
-      const workbook = await generateWorkbook(uid, startDate as string, endDate as string, branding);
+      const workbook = await generateWorkbook(uid, startDate as string, endDate as string, branding, (user as any)?.baseCurrency || 'USD');
       const buffer = await workbook.xlsx.writeBuffer();
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=financial-report.xlsx');
       return res.send(buffer);
     }
 
-    const statements = await getFinancialStatements(uid, startDate as string, endDate as string);
+    const statements = await getFinancialStatements(uid, startDate as string, endDate as string, ((await User.findById(uid).lean().catch(() => null)) as any)?.baseCurrency || 'USD');
     const { profitLoss, balanceSheet, cashFlow } = statements as any;
 
     return res.status(200).json({

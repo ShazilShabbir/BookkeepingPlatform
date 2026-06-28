@@ -14,16 +14,17 @@ interface ReportData {
   balanceSheet: { sections: StatementSection[]; totalAssets: number; totalLiabilities: number; totalEquity: number; };
   cashFlow: { sections: CashFlowSection[]; totalChange: number; };
   dateRange: { start: string | null; end: string | null; };
+  baseCurrency: string;
 }
 
-const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+const fmt = (n: number, currency = 'USD') => n.toLocaleString('en-US', { style: 'currency', currency });
 
-function SectionTable({ section }: { section: StatementSection }) {
+function SectionTable({ section, currency }: { section: StatementSection; currency: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-surface-700">{section.title}</h3>
-        <span className="text-base font-bold text-surface-900">{fmt(section.total)}</span>
+        <span className="text-base font-bold text-surface-900">{fmt(section.total, currency)}</span>
       </div>
       <div className="overflow-x-auto border border-surface-200 rounded-lg">
         <table className="w-full text-xs">
@@ -34,7 +35,7 @@ function SectionTable({ section }: { section: StatementSection }) {
                   <span className="font-mono text-surface-400 mr-1.5">{acc.accountCode === 'net-income' ? '' : acc.accountCode}</span>
                   <span className="text-surface-800">{acc.accountName}</span>
                 </td>
-                <td className="py-1.5 px-3 text-right font-mono font-medium text-surface-900">{fmt(acc.balance)}</td>
+                <td className="py-1.5 px-3 text-right font-mono font-medium text-surface-900">{fmt(acc.balance, currency)}</td>
               </tr>
             ))}
           </tbody>
@@ -44,12 +45,12 @@ function SectionTable({ section }: { section: StatementSection }) {
   );
 }
 
-function CFSection({ section }: { section: CashFlowSection }) {
+function CFSection({ section, currency }: { section: CashFlowSection; currency: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-surface-700">{section.title}</h3>
-        <span className={`text-base font-bold ${section.total >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(section.total)}</span>
+        <span className={`text-base font-bold ${section.total >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(section.total, currency)}</span>
       </div>
       <div className="overflow-x-auto border border-surface-200 rounded-lg">
         <table className="w-full text-xs">
@@ -61,7 +62,7 @@ function CFSection({ section }: { section: CashFlowSection }) {
                   <span className="text-surface-800">{item.accountName}</span>
                 </td>
                 <td className={`py-1.5 px-3 text-right font-mono font-medium ${item.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {item.amount >= 0 ? fmt(item.amount) : `(${fmt(Math.abs(item.amount))})`}
+                  {item.amount >= 0 ? fmt(item.amount, currency) : `(${fmt(Math.abs(item.amount), currency)})`}
                 </td>
               </tr>
             ))}
@@ -209,15 +210,15 @@ export default function PublicReport() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 <div className="bg-emerald-50 rounded-lg p-4 text-center">
                   <p className="text-xs text-surface-500 uppercase tracking-wider">Revenue</p>
-                  <p className="text-lg font-bold text-emerald-600 mt-1">{fmt(profitLoss.sections.find(s => s.type === 'revenue')?.total || 0)}</p>
+                  <p className="text-lg font-bold text-emerald-600 mt-1">{fmt(profitLoss.sections.find(s => s.type === 'revenue')?.total || 0, data?.baseCurrency || 'USD')}</p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-4 text-center">
                   <p className="text-xs text-surface-500 uppercase tracking-wider">Expenses</p>
-                  <p className="text-lg font-bold text-red-500 mt-1">{fmt(profitLoss.sections.find(s => s.type === 'expense')?.total || 0)}</p>
+                  <p className="text-lg font-bold text-red-500 mt-1">{fmt(profitLoss.sections.find(s => s.type === 'expense')?.total || 0, data?.baseCurrency || 'USD')}</p>
                 </div>
                 <div className={`rounded-lg p-4 text-center ${profitLoss.netIncome >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
                   <p className="text-xs text-surface-500 uppercase tracking-wider">Net Profit</p>
-                  <p className={`text-lg font-bold mt-1 ${profitLoss.netIncome >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(profitLoss.netIncome)}</p>
+                  <p className={`text-lg font-bold mt-1 ${profitLoss.netIncome >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(profitLoss.netIncome, data?.baseCurrency || 'USD')}</p>
                 </div>
                 <div className="bg-indigo-50 rounded-lg p-4 text-center">
                   <p className="text-xs text-surface-500 uppercase tracking-wider">Margin</p>
@@ -232,11 +233,11 @@ export default function PublicReport() {
           <Card padding="lg" ref={plRef}>
             <h2 className="text-base font-semibold text-surface-900 mb-4">Profit & Loss</h2>
             <div className="space-y-4">
-              {profitLoss.sections.map(s => <SectionTable key={s.type} section={s} />)}
+              {profitLoss.sections.map(s => <SectionTable key={s.type} section={s} currency={data?.baseCurrency || 'USD'} />)}
             </div>
             <div className="mt-4 p-4 bg-surface-50 rounded-lg border border-surface-200 text-center">
               <p className="text-xs text-surface-500">Net Income</p>
-              <p className={`text-xl font-bold ${profitLoss.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(profitLoss.netIncome)}</p>
+              <p className={`text-xl font-bold ${profitLoss.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(profitLoss.netIncome, data?.baseCurrency || 'USD')}</p>
             </div>
           </Card>
         )}
@@ -245,13 +246,13 @@ export default function PublicReport() {
           <Card padding="lg" ref={bsRef}>
             <h2 className="text-base font-semibold text-surface-900 mb-4">Balance Sheet</h2>
             <div className="space-y-4">
-              {balanceSheet.sections.map(s => <SectionTable key={s.type} section={s} />)}
+              {balanceSheet.sections.map(s => <SectionTable key={s.type} section={s} currency={data?.baseCurrency || 'USD'} />)}
             </div>
             <div className="mt-4 p-4 bg-surface-50 rounded-lg border border-surface-200">
               <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                <div><p className="text-xs text-surface-500">Assets</p><p className="font-bold text-indigo-600">{fmt(balanceSheet.totalAssets)}</p></div>
-                <div><p className="text-xs text-surface-500">Liabilities</p><p className="font-bold text-red-600">{fmt(balanceSheet.totalLiabilities)}</p></div>
-                <div><p className="text-xs text-surface-500">Equity</p><p className="font-bold text-emerald-600">{fmt(balanceSheet.totalEquity)}</p></div>
+                <div><p className="text-xs text-surface-500">Assets</p><p className="font-bold text-indigo-600">{fmt(balanceSheet.totalAssets, data?.baseCurrency || 'USD')}</p></div>
+                <div><p className="text-xs text-surface-500">Liabilities</p><p className="font-bold text-red-600">{fmt(balanceSheet.totalLiabilities, data?.baseCurrency || 'USD')}</p></div>
+                <div><p className="text-xs text-surface-500">Equity</p><p className="font-bold text-emerald-600">{fmt(balanceSheet.totalEquity, data?.baseCurrency || 'USD')}</p></div>
               </div>
               <p className="text-center text-xs text-surface-400 mt-3">
                 {Math.abs(balanceSheet.totalAssets - balanceSheet.totalLiabilities - balanceSheet.totalEquity) < 0.01
@@ -268,10 +269,10 @@ export default function PublicReport() {
               <p className="text-sm text-surface-400 text-center py-4">No cash flow data</p>
             ) : (
               <div className="space-y-4">
-                {cashFlow.sections.map(s => <CFSection key={s.title} section={s} />)}
+                {cashFlow.sections.map(s => <CFSection key={s.title} section={s} currency={data?.baseCurrency || 'USD'} />)}
                 <div className="p-4 bg-surface-50 rounded-lg border border-surface-200 text-center">
                   <p className="text-xs text-surface-500">Net Change in Cash</p>
-                  <p className={`text-xl font-bold ${cashFlow.totalChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(cashFlow.totalChange)}</p>
+                  <p className={`text-xl font-bold ${cashFlow.totalChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmt(cashFlow.totalChange, data?.baseCurrency || 'USD')}</p>
                 </div>
               </div>
             )}

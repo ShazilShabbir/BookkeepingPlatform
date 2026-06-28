@@ -5,6 +5,7 @@ export interface IBudget extends Document {
   accountCode: string;
   month: string;
   amount: number;
+  currency: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,6 +16,7 @@ const BudgetSchema = new Schema<IBudget>(
     accountCode: { type: String, required: true },
     month: { type: String, required: true },
     amount: { type: Number, required: true, min: 0 },
+    currency: { type: String, default: 'USD' },
   },
   { timestamps: true },
 );

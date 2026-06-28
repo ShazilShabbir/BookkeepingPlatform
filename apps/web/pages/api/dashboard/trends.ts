@@ -4,7 +4,9 @@ import dbConnect from '@/lib/mongoose';
 import JournalEntry from '@/lib/models/JournalEntry';
 import JournalLine from '@/lib/models/JournalLine';
 import Account from '@/lib/models/Account';
+import User from '@/lib/models/User';
 import { resolveUserIdFromQuery } from '@/lib/customerContext';
+import { convertJournalLines } from '@/lib/currency';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -16,6 +18,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await dbConnect();
 
   try {
+    const userDoc = await User.findById(uid).select('baseCurrency').lean() as any;
+    const baseCurrency = userDoc?.baseCurrency || 'USD';
+
     const { startDate: sdParam, endDate: edParam, months } = req.query;
     let dateFilter: Record<string, any> = {};
     if (sdParam || edParam) {
@@ -34,10 +39,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }).select('_id date').lean();
 
     const entryIds = entries.map(e => (e as any)._id.toString());
-    const lines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
+    const rawLines = await JournalLine.find({ journalEntryId: { $in: entryIds }, userId: uid }).lean();
     const accountDocs = await Account.find({ userId: uid, isActive: true }).lean();
     const accountMap = new Map<string, string>();
-    for (const a of accountDocs) accountMap.set(a.code, a.type);
+    const currencyMap = new Map<string, { currency?: string }>();
+    for (const a of accountDocs) {
+      accountMap.set(a.code, a.type);
+      currencyMap.set(a.code, { currency: (a as any).currency || 'USD' });
+    }
+
+    const lines = await convertJournalLines(uid, rawLines, currencyMap, baseCurrency);
 
     const monthlyData = new Map<string, { revenue: number; expenses: number; profit: number }>();
 
@@ -70,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         profit: Math.round((data.revenue - data.expenses) * 100) / 100,
       }));
 
-    return res.status(200).json({ success: true, data: result });
+    return res.status(200).json({ success: true, data: result, baseCurrency });
   } catch (e: any) {
     console.error('dashboard trends error:', e?.message || e);
     return res.status(500).json({ success: false, error: 'Internal server error' });

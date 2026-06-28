@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import toast from 'react-hot-toast';
-import { formatNumber } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 
 interface TrialBalanceRow {
   accountCode: string;
@@ -39,6 +39,7 @@ export default memo(function TrialBalance() {
   const [typeFilter, setTypeFilter] = useState('');
   const [data, setData] = useState<TrialBalanceData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [baseCurrency, setBaseCurrency] = useState('USD');
 
   const runTrialBalance = useCallback(async () => {
     setLoading(true);
@@ -52,6 +53,7 @@ export default memo(function TrialBalance() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Failed to load trial balance');
       setData(json.data);
+      if (json.data?.baseCurrency) setBaseCurrency(json.data.baseCurrency);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to load trial balance');
     } finally {
@@ -132,12 +134,12 @@ export default memo(function TrialBalance() {
                             row.accountType === 'revenue' ? 'success' : 'danger'
                           } size="sm">{row.accountType}</Badge>
                         </td>
-                        <td className="py-2 px-4 text-right font-mono text-surface-700">{formatNumber(row.totalDebits)}</td>
-                        <td className="py-2 px-4 text-right font-mono text-surface-700">{formatNumber(row.totalCredits)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-surface-700">{formatCurrency(row.totalDebits, baseCurrency)}</td>
+                        <td className="py-2 px-4 text-right font-mono text-surface-700">{formatCurrency(row.totalCredits, baseCurrency)}</td>
                         <td className={`py-2 px-4 text-right font-mono font-medium ${
                           row.netBalance >= 0 ? 'text-surface-900' : 'text-red-600'
                         }`}>
-                          {formatNumber(row.netBalance)}
+                          {formatCurrency(row.netBalance, baseCurrency)}
                         </td>
                       </tr>
                     ))}
@@ -145,13 +147,13 @@ export default memo(function TrialBalance() {
                   <tfoot>
                     <tr className="border-t-2 border-surface-300 bg-surface-50 font-semibold">
                       <td className="py-3 px-4 text-surface-700" colSpan={3}>Totals</td>
-                      <td className="py-3 px-4 text-right font-mono text-surface-900">{formatNumber(data.totals.totalDebits)}</td>
-                      <td className="py-3 px-4 text-right font-mono text-surface-900">{formatNumber(data.totals.totalCredits)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-surface-900">{formatCurrency(data.totals.totalDebits, baseCurrency)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-surface-900">{formatCurrency(data.totals.totalCredits, baseCurrency)}</td>
                       <td className="py-3 px-4 text-right font-mono">
                         {data.totals.balanced ? (
                           <span className="text-emerald-600">Balanced</span>
                         ) : (
-                          <span className="text-red-600">Diff: {formatNumber(data.totals.difference)}</span>
+                          <span className="text-red-600">Diff: {formatCurrency(data.totals.difference, baseCurrency)}</span>
                         )}
                       </td>
                     </tr>
@@ -161,9 +163,9 @@ export default memo(function TrialBalance() {
 
               {!data.totals.balanced && (
                 <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-sm text-red-700">
-                  <strong>Trial balance is out of balance!</strong> Total debits (${formatNumber(data.totals.totalDebits)}) 
-                  {' '}do not equal total credits (${formatNumber(data.totals.totalCredits)}).
-                  {' '}Difference: ${formatNumber(data.totals.difference)}.
+                  <strong>Trial balance is out of balance!</strong> Total debits ({formatCurrency(data.totals.totalDebits, baseCurrency)}) 
+                  {' '}do not equal total credits ({formatCurrency(data.totals.totalCredits, baseCurrency)}).
+                  {' '}Difference: {formatCurrency(data.totals.difference, baseCurrency)}.
                 </div>
               )}
             </>

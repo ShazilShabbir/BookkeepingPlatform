@@ -22,12 +22,33 @@ const resourceLabels: Record<string, string> = {
 
 const PAGE_SIZE = 20;
 
+function TrashSkeleton() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center justify-between bg-surface-50 rounded-lg px-4 py-3 animate-pulse">
+          <div className="min-w-0 flex-1">
+            <div className="h-3 w-16 bg-surface-200 rounded mb-2" />
+            <div className="h-4 w-48 bg-surface-200 rounded mb-1" />
+            <div className="h-3 w-32 bg-surface-200 rounded" />
+          </div>
+          <div className="flex gap-1 ml-4">
+            <div className="h-8 w-8 bg-surface-200 rounded" />
+            <div className="h-8 w-8 bg-surface-200 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TrashPanel({ userId }: { userId: string }) {
   const [items, setItems] = useState<TrashItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const loadTrash = async (pg: number = page) => {
     setLoading(true);
@@ -48,12 +69,32 @@ export default function TrashPanel({ userId }: { userId: string }) {
 
   useEffect(() => { loadTrash(1); }, []);
 
+  const restoreItem = async (id: string) => {
+    try {
+      const res = await fetch('/api/trash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Item restored');
+        loadTrash();
+      } else {
+        toast.error(json.error || 'Failed to restore');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
+
   const deletePermanently = async (id: string) => {
     try {
       const res = await fetch(`/api/trash?id=${id}&userId=` + encodeURIComponent(userId), { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         toast.success('Deleted permanently');
+        setConfirmDelete(null);
         loadTrash();
       } else {
         toast.error(json.error || 'Failed to delete');
@@ -76,7 +117,7 @@ export default function TrashPanel({ userId }: { userId: string }) {
         </p>
 
         {loading ? (
-          <div className="text-center py-8 text-surface-400">Loading trash...</div>
+          <TrashSkeleton />
         ) : items.length === 0 ? (
           <EmptyState
             icon={
@@ -101,15 +142,43 @@ export default function TrashPanel({ userId }: { userId: string }) {
                     <p className="text-sm font-medium text-surface-900 truncate mt-0.5">{item.label || '(no label)'}</p>
                     <p className="text-xs text-surface-400">Deleted {formatDate(item.createdAt)}</p>
                   </div>
-                  <button
-                    onClick={() => deletePermanently(item._id)}
-                    className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors shrink-0 ml-4 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center"
-                    title="Delete permanently"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-1 ml-4">
+                    <button
+                      onClick={() => restoreItem(item._id)}
+                      className="p-2.5 sm:p-1.5 text-surface-400 hover:text-emerald-600 transition-colors shrink-0 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg hover:bg-surface-100"
+                      title="Restore"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                    </button>
+                    {confirmDelete === item._id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => deletePermanently(item._id)}
+                          className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(null)}
+                          className="px-2 py-1 text-xs font-medium text-surface-600 hover:text-surface-800 bg-surface-100 hover:bg-surface-200 rounded transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelete(item._id)}
+                        className="p-2.5 sm:p-1.5 text-surface-400 hover:text-red-500 transition-colors shrink-0 min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg hover:bg-surface-100"
+                        title="Delete permanently"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -119,12 +188,12 @@ export default function TrashPanel({ userId }: { userId: string }) {
                   {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
                 </span>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => { setPage(p => p - 1); loadTrash(page - 1); }} disabled={page <= 1}>
-                    Previous
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={() => { setPage(p => p + 1); loadTrash(page + 1); }} disabled={page >= totalPages}>
-                    Next
-                  </Button>
+                <Button size="sm" variant="secondary" onClick={() => { const pg = page - 1; setPage(pg); loadTrash(pg); }} disabled={page <= 1}>
+                  Previous
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => { const pg = page + 1; setPage(pg); loadTrash(pg); }} disabled={page >= totalPages}>
+                  Next
+                </Button>
                 </div>
               </div>
             )}
